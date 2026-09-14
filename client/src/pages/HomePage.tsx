@@ -25,14 +25,14 @@ export function HomePage() {
       />
 
       {/* Modular Homepage Architecture */}
-      <main id="main-content" className="flex flex-col min-h-screen">
+      <div className="flex flex-col">
         <HeroSection />
         <PillarsSection />
         <ToolsPreviewSection />
         <CurriculumSection />
         <PrivacyBanner />
         <CtaSection />
-      </main>
+      </div>
     </>
   );
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { Menu, X, BookOpen, Wrench, Info } from 'lucide-react';
+import { Container } from './Container';
 import { MobileNav } from './MobileNav';
 
 const navItems = [
@@ -15,7 +16,7 @@ export function Header() {
   return (
     <>
       <header className="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-md border-b border-neutral-200/80 transition-all duration-200">
-        <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12">
+        <Container>
           <div className="flex items-center justify-between h-16">
             {/* Brand */}
             <Link to="/" className="flex items-center gap-2.5 group" aria-label="ToolSAP Home">
@@ -79,7 +80,7 @@ export function Header() {
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
           </div>
-        </div>
+        </Container>
       </header>
 
       {/* Mobile Navigation */}

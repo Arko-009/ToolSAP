@@ -69,10 +69,10 @@ export function HeroSection() {
 
             {/* All 6 Trust & Value Indicators in a Single Line */}
             <div className="mt-8 pt-5 border-t border-neutral-200/70 w-full overflow-x-auto no-scrollbar">
-              <div className="grid grid-cols-6 gap-2 w-full min-w-0 items-stretch">
+              <div className="grid grid-cols-6 gap-2.5 sm:gap-3 w-full min-w-0 items-stretch">
                 {/* Item 1: 100% Client-Side Privacy */}
                 <div
-                  className="flex flex-col justify-between p-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-emerald-300 hover:shadow-xs transition-all min-w-0 group"
+                  className="flex flex-col justify-between px-1.5 py-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-emerald-300 hover:shadow-xs transition-all min-w-0 group"
                   title="100% Client-Side Privacy — Your data stays in your browser"
                 >
                   <div className="w-6 h-6 rounded-lg bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-600 mb-1.5 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
@@ -86,7 +86,7 @@ export function HeroSection() {
 
                 {/* Item 2: Zero Server Storage */}
                 <div
-                  className="flex flex-col justify-between p-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-purple-300 hover:shadow-xs transition-all min-w-0 group"
+                  className="flex flex-col justify-between px-1.5 py-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-purple-300 hover:shadow-xs transition-all min-w-0 group"
                   title="Zero Server Storage — We don't store your payloads"
                 >
                   <div className="w-6 h-6 rounded-lg bg-purple-50 border border-purple-200/80 flex items-center justify-center text-purple-600 mb-1.5 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
@@ -100,7 +100,7 @@ export function HeroSection() {
 
                 {/* Item 3: SAP Integration Focused */}
                 <div
-                  className="flex flex-col justify-between p-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-amber-300 hover:shadow-xs transition-all min-w-0 group"
+                  className="flex flex-col justify-between px-1.5 py-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-amber-300 hover:shadow-xs transition-all min-w-0 group"
                   title="SAP Integration Focused — Built for real-world use cases"
                 >
                   <div className="w-6 h-6 rounded-lg bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-600 mb-1.5 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
@@ -114,7 +114,7 @@ export function HeroSection() {
 
                 {/* Item 4: Built for Speed */}
                 <div
-                  className="flex flex-col justify-between p-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-sky-300 hover:shadow-xs transition-all min-w-0 group"
+                  className="flex flex-col justify-between px-1.5 py-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-sky-300 hover:shadow-xs transition-all min-w-0 group"
                   title="⚡ Built for Speed — Fast tools, instant results, zero setup"
                 >
                   <div className="w-6 h-6 rounded-lg bg-sky-50 border border-sky-200/80 flex items-center justify-center text-sky-600 mb-1.5 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
@@ -128,7 +128,7 @@ export function HeroSection() {
 
                 {/* Item 5: Developer First */}
                 <div
-                  className="flex flex-col justify-between p-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition-all min-w-0 group"
+                  className="flex flex-col justify-between px-1.5 py-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition-all min-w-0 group"
                   title="🧩 Developer First — Practical workflows, not complicated documentation"
                 >
                   <div className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-200/80 flex items-center justify-center text-indigo-600 mb-1.5 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
@@ -142,7 +142,7 @@ export function HeroSection() {
 
                 {/* Item 6: Learn by Doing */}
                 <div
-                  className="flex flex-col justify-between p-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-rose-300 hover:shadow-xs transition-all min-w-0 group"
+                  className="flex flex-col justify-between px-1.5 py-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-rose-300 hover:shadow-xs transition-all min-w-0 group"
                   title="🚀 Learn by Doing — Examples, hands-on practice, real SAP scenarios"
                 >
                   <div className="w-6 h-6 rounded-lg bg-rose-50 border border-rose-200/80 flex items-center justify-center text-rose-600 mb-1.5 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">

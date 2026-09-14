@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { Menu, X, BookOpen, Wrench, Info } from 'lucide-react';
+import { Menu, X, BookOpen, Wrench, Info, Search } from 'lucide-react';
 import { Container } from './Container';
 import { MobileNav } from './MobileNav';
 
@@ -54,16 +54,24 @@ export function Header() {
             </nav>
 
             {/* Desktop Actions */}
-            <div className="hidden md:flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-2.5">
+              <button
+                type="button"
+                className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
+                aria-label="Search documentation and tools"
+                title="Search"
+              >
+                <Search className="h-4 w-4" />
+              </button>
               <Link
                 to="/tools"
-                className="text-xs font-semibold text-neutral-600 hover:text-neutral-900 px-3 py-1.5 rounded-lg hover:bg-neutral-100 transition-colors"
+                className="text-xs font-semibold text-neutral-600 hover:text-neutral-900 px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 transition-colors"
               >
                 Free Tools
               </Link>
               <Link
                 to="/learning"
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-primary-600 rounded-lg hover:bg-primary-700 active:bg-primary-800 transition-all duration-150 shadow-xs hover:shadow-sm"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-primary-600 rounded-xl hover:bg-primary-700 active:bg-primary-800 transition-all duration-150 shadow-xs hover:shadow-sm"
               >
                 <span>Start Learning</span>
                 <span className="text-primary-200">→</span>

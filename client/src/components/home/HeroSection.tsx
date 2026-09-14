@@ -1,45 +1,56 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, BookOpen, Wrench, ShieldCheck, Terminal, Sparkles } from 'lucide-react';
+import {
+  ArrowRight,
+  BookOpen,
+  Wrench,
+  ShieldCheck,
+  Zap,
+  Layers,
+  GraduationCap,
+  Code2,
+  Users2,
+  Rocket,
+} from 'lucide-react';
 import { Container } from '@/components/layout/Container';
 import { IntegrationFlowGraphic } from './IntegrationFlowGraphic';
 
 export function HeroSection() {
   return (
-    <section className="relative pt-8 pb-14 sm:pt-12 sm:pb-18 lg:pt-14 lg:pb-20 overflow-hidden border-b border-neutral-200/70 bg-gradient-to-b from-white via-neutral-50/20 to-white">
-      {/* Subtle background technical grid pattern */}
-      <div className="absolute inset-0 -z-10 bg-grid-subtle opacity-50 pointer-events-none" />
-
-      {/* Soft gradient focal lights */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[300px] bg-primary-100/30 rounded-full blur-3xl -z-10 pointer-events-none" />
+    <section className="relative pt-8 pb-14 sm:pt-12 sm:pb-16 lg:pt-14 lg:pb-16 overflow-hidden border-b border-neutral-200/70 bg-gradient-to-b from-white via-neutral-50/25 to-white">
+      {/* Background Soft Light & Dot Matrix */}
+      <div className="absolute top-1/4 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-primary-100/25 rounded-full blur-3xl -z-10 pointer-events-none" />
 
       <Container>
-        <div className="grid lg:grid-cols-12 gap-8 lg:gap-10 xl:gap-12 items-center">
-          {/* Left Column: Editorial Content (6 cols) */}
+        {/* Main 2-Column Grid */}
+        <div className="grid lg:grid-cols-12 gap-8 lg:gap-8 xl:gap-12 items-center">
+          {/* Left Column: Editorial & Value Proposition (6 cols) */}
           <div className="lg:col-span-6 text-left flex flex-col justify-center">
             {/* Eyebrow Pill */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50 border border-primary-200/80 text-primary-700 text-xs font-semibold tracking-wide uppercase mb-4 shadow-2xs self-start">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary-600 animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50/90 border border-primary-200/80 text-primary-700 text-xs font-semibold tracking-wide uppercase mb-5 shadow-2xs self-start">
+              <span className="w-2 h-2 rounded-full bg-primary-600 animate-pulse" />
               <span>SAP Integration Developer Platform</span>
             </div>
 
-            {/* Main Headline - Controlled Height, No Artificial 4-line Stacking */}
-            <h1 className="text-3xl sm:text-4xl lg:text-[2.6rem] xl:text-[2.9rem] font-extrabold text-neutral-900 tracking-tight leading-[1.18]">
-              Learn SAP. Build Faster.{' '}
-              <span className="text-primary-600 block sm:inline lg:block xl:inline">
-                Solve Integration Problems.
+            {/* Main Headline */}
+            <h1 className="text-4xl sm:text-5xl lg:text-[3.35rem] font-extrabold text-neutral-950 tracking-tight leading-[1.08]">
+              Learn SAP.<br />
+              Build Faster.<br />
+              <span className="text-primary-600">
+                Solve Integration<br />
+                Problems.
               </span>
             </h1>
 
-            {/* Value Proposition Copy */}
-            <p className="mt-4 text-sm sm:text-base text-neutral-600 max-w-lg leading-relaxed font-normal">
-              A modern, developer-first platform combining structured, production-grade SAP Integration Suite lessons with free, client-side tools designed for everyday SAP workflows.
+            {/* Subheading / Copy */}
+            <p className="mt-5 text-base sm:text-lg text-neutral-600 max-w-lg leading-relaxed font-normal">
+              A modern, developer-first platform combining structured, practical SAP Integration Suite lessons with free, client-side tools designed for everyday SAP workflows.
             </p>
 
-            {/* Action CTAs */}
-            <div className="mt-6 flex flex-wrap items-center gap-3">
+            {/* CTA Buttons */}
+            <div className="mt-7 flex flex-wrap items-center gap-3.5">
               <Link
                 to="/learning"
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-primary-600 rounded-xl hover:bg-primary-700 active:bg-primary-800 transition-all duration-150 shadow-xs hover:shadow-sm"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-primary-600 rounded-xl hover:bg-primary-700 active:bg-primary-800 transition-all duration-150 shadow-xs hover:shadow-sm"
               >
                 <BookOpen className="h-4 w-4" />
                 <span>Start Learning Free</span>
@@ -47,33 +58,108 @@ export function HeroSection() {
               </Link>
               <Link
                 to="/tools"
-                className="inline-flex items-center justify-center gap-2 px-4.5 py-2.5 text-xs sm:text-sm font-semibold text-neutral-700 bg-white border border-neutral-200/90 rounded-xl hover:border-neutral-300 hover:bg-neutral-50 transition-all duration-150 shadow-2xs"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold text-neutral-800 bg-white border border-neutral-200/90 rounded-xl hover:border-neutral-300 hover:bg-neutral-50 transition-all duration-150 shadow-2xs"
               >
                 <Wrench className="h-4 w-4 text-neutral-500" />
                 <span>Explore Developer Tools</span>
               </Link>
             </div>
 
-            {/* Authentic Trust / Architecture Badges */}
-            <div className="mt-7 pt-5 border-t border-neutral-200/60 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-neutral-500">
-              <div className="flex items-center gap-1.5">
-                <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-                <span className="font-medium text-neutral-700">100% Client-Side Privacy</span>
+            {/* Trust Indicators (3 items with 2-line text matching mockup) */}
+            <div className="mt-8 pt-6 border-t border-neutral-200/70 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Item 1 */}
+              <div className="flex items-start gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5 shadow-2xs">
+                  <ShieldCheck className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-neutral-900 leading-tight">100% Client-Side Privacy</div>
+                  <div className="text-[11px] text-neutral-500 mt-0.5">Your data stays in your browser</div>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <Terminal className="h-4 w-4 text-primary-600 shrink-0" />
-                <span className="font-medium text-neutral-700">Zero Server Storage</span>
+
+              {/* Item 2 */}
+              <div className="flex items-start gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-purple-50 border border-purple-200/80 flex items-center justify-center text-purple-600 shrink-0 mt-0.5 shadow-2xs">
+                  <Zap className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-neutral-900 leading-tight">Zero Server Storage</div>
+                  <div className="text-[11px] text-neutral-500 mt-0.5">We don't store your payloads</div>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
-                <span className="font-medium text-neutral-700">SAP Integration Suite Focused</span>
+
+              {/* Item 3 */}
+              <div className="flex items-start gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-600 shrink-0 mt-0.5 shadow-2xs">
+                  <Layers className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-neutral-900 leading-tight">SAP Integration Focused</div>
+                  <div className="text-[11px] text-neutral-500 mt-0.5">Built for real-world use cases</div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Technical Visual (6 cols) */}
+          {/* Right Column: Visual System (6 cols) */}
           <div className="lg:col-span-6 w-full flex items-center justify-center">
             <IntegrationFlowGraphic />
+          </div>
+        </div>
+
+        {/* Bottom Feature Strip (Matching Mockup) */}
+        <div className="mt-14 pt-8 border-t border-neutral-200/70 relative">
+          <div className="text-center -mt-11 mb-6">
+            <span className="inline-block px-4 py-1 bg-neutral-50 rounded-full border border-neutral-200/60 text-[11px] font-bold uppercase tracking-widest text-neutral-500 shadow-2xs">
+              Trusted by SAP Developers Worldwide
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+            {/* Card 1 */}
+            <div className="flex items-center gap-3 p-3 sm:p-3.5 rounded-xl bg-white border border-neutral-200/80 shadow-xs hover:border-primary-200 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-primary-50 border border-primary-100 flex items-center justify-center text-primary-600 shrink-0">
+                <GraduationCap className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-neutral-900 truncate">Practical Learning</div>
+                <div className="text-[11px] text-neutral-500 truncate">Concepts, examples, hands-on</div>
+              </div>
+            </div>
+
+            {/* Card 2 */}
+            <div className="flex items-center gap-3 p-3 sm:p-3.5 rounded-xl bg-white border border-neutral-200/80 shadow-xs hover:border-primary-200 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-600 shrink-0">
+                <Code2 className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-neutral-900 truncate">Useful Developer Tools</div>
+                <div className="text-[11px] text-neutral-500 truncate">Format, validate, convert, test</div>
+              </div>
+            </div>
+
+            {/* Card 3 */}
+            <div className="flex items-center gap-3 p-3 sm:p-3.5 rounded-xl bg-white border border-neutral-200/80 shadow-xs hover:border-purple-200 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0">
+                <Users2 className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-neutral-900 truncate">Real-World Scenarios</div>
+                <div className="text-[11px] text-neutral-500 truncate">Built for actual development</div>
+              </div>
+            </div>
+
+            {/* Card 4 */}
+            <div className="flex items-center gap-3 p-3 sm:p-3.5 rounded-xl bg-white border border-neutral-200/80 shadow-xs hover:border-primary-200 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center text-primary-600 shrink-0">
+                <Rocket className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-neutral-900 truncate">Developer First</div>
+                <div className="text-[11px] text-neutral-500 truncate">Fast. Simple. Effective.</div>
+              </div>
+            </div>
           </div>
         </div>
       </Container>

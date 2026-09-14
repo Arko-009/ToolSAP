@@ -67,19 +67,92 @@ export function HeroSection() {
               </Link>
             </div>
 
-            {/* Quick Trust Badges */}
-            <div className="mt-8 pt-5 border-t border-neutral-200/60 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-neutral-500">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-                <span className="font-medium text-neutral-700">100% Client-Side Privacy</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-sky-600 shrink-0" />
-                <span className="font-medium text-neutral-700">Instant In-Browser Execution</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Layers className="h-4 w-4 text-primary-600 shrink-0" />
-                <span className="font-medium text-neutral-700">SAP Integration Suite</span>
+            {/* All 6 Trust & Value Indicators in a Single Line */}
+            <div className="mt-8 pt-5 border-t border-neutral-200/70 w-full overflow-x-auto no-scrollbar">
+              <div className="grid grid-cols-6 gap-2 w-full min-w-0 items-stretch">
+                {/* Item 1: 100% Client-Side Privacy */}
+                <div
+                  className="flex flex-col justify-between p-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-emerald-300 hover:shadow-xs transition-all min-w-0 group"
+                  title="100% Client-Side Privacy — Your data stays in your browser"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-600 mb-1.5 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold text-neutral-900 leading-tight truncate">100% Privacy</div>
+                    <div className="text-[9px] text-neutral-500 mt-0.5 leading-tight truncate">In-browser data</div>
+                  </div>
+                </div>
+
+                {/* Item 2: Zero Server Storage */}
+                <div
+                  className="flex flex-col justify-between p-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-purple-300 hover:shadow-xs transition-all min-w-0 group"
+                  title="Zero Server Storage — We don't store your payloads"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-purple-50 border border-purple-200/80 flex items-center justify-center text-purple-600 mb-1.5 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                    <Database className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold text-neutral-900 leading-tight truncate">Zero Storage</div>
+                    <div className="text-[9px] text-neutral-500 mt-0.5 leading-tight truncate">No payloads saved</div>
+                  </div>
+                </div>
+
+                {/* Item 3: SAP Integration Focused */}
+                <div
+                  className="flex flex-col justify-between p-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-amber-300 hover:shadow-xs transition-all min-w-0 group"
+                  title="SAP Integration Focused — Built for real-world use cases"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-600 mb-1.5 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                    <Layers className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold text-neutral-900 leading-tight truncate">SAP Focused</div>
+                    <div className="text-[9px] text-neutral-500 mt-0.5 leading-tight truncate">Real-world cases</div>
+                  </div>
+                </div>
+
+                {/* Item 4: Built for Speed */}
+                <div
+                  className="flex flex-col justify-between p-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-sky-300 hover:shadow-xs transition-all min-w-0 group"
+                  title="⚡ Built for Speed — Fast tools, instant results, zero setup"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-sky-50 border border-sky-200/80 flex items-center justify-center text-sky-600 mb-1.5 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                    <Zap className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold text-neutral-900 leading-tight truncate">Built for Speed</div>
+                    <div className="text-[9px] text-neutral-500 mt-0.5 leading-tight truncate">Instant results</div>
+                  </div>
+                </div>
+
+                {/* Item 5: Developer First */}
+                <div
+                  className="flex flex-col justify-between p-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition-all min-w-0 group"
+                  title="🧩 Developer First — Practical workflows, not complicated documentation"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-200/80 flex items-center justify-center text-indigo-600 mb-1.5 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                    <Puzzle className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold text-neutral-900 leading-tight truncate">Developer First</div>
+                    <div className="text-[9px] text-neutral-500 mt-0.5 leading-tight truncate">Practical workflows</div>
+                  </div>
+                </div>
+
+                {/* Item 6: Learn by Doing */}
+                <div
+                  className="flex flex-col justify-between p-2 rounded-xl bg-white/90 border border-neutral-200/80 shadow-2xs hover:border-rose-300 hover:shadow-xs transition-all min-w-0 group"
+                  title="🚀 Learn by Doing — Examples, hands-on practice, real SAP scenarios"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-rose-50 border border-rose-200/80 flex items-center justify-center text-rose-600 mb-1.5 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                    <Rocket className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold text-neutral-900 leading-tight truncate">Learn by Doing</div>
+                    <div className="text-[9px] text-neutral-500 mt-0.5 leading-tight truncate">Hands-on practice</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -90,7 +163,7 @@ export function HeroSection() {
           </div>
         </div>
 
-        {/* All 6 Indicators Spread Equally Throughout the Full Width Line */}
+        {/* Platform Pillars Section */}
         <div className="mt-12 pt-8 border-t border-neutral-200/70 relative">
           <div className="text-center -mt-11 mb-6">
             <span className="inline-block px-4 py-1 bg-neutral-50 rounded-full border border-neutral-200/60 text-[11px] font-bold uppercase tracking-widest text-neutral-500 shadow-2xs">
@@ -98,70 +171,44 @@ export function HeroSection() {
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-3.5 items-stretch w-full">
-            {/* Card 1: 100% Client-Side Privacy */}
-            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-white border border-neutral-200/80 shadow-2xs hover:border-emerald-300 hover:shadow-xs transition-all min-w-0 group">
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-600 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                <ShieldCheck className="h-4 w-4" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
+            <div className="flex items-start gap-3.5 p-4 rounded-xl bg-white border border-neutral-200/80 shadow-2xs hover:border-primary-200 transition-colors">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200/80 flex items-center justify-center text-primary-600 shrink-0 shadow-2xs">
+                <BookOpen className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-bold text-neutral-900 leading-tight">100% Privacy</div>
-                <div className="text-[11px] text-neutral-500 mt-1 leading-snug">Data stays in browser</div>
+                <div className="text-sm font-bold text-neutral-900 leading-tight">Practical Learning</div>
+                <div className="text-xs text-neutral-500 mt-0.5 leading-snug">Concepts, examples, hands-on</div>
               </div>
             </div>
 
-            {/* Card 2: Zero Server Storage */}
-            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-white border border-neutral-200/80 shadow-2xs hover:border-purple-300 hover:shadow-xs transition-all min-w-0 group">
-              <div className="w-8 h-8 rounded-xl bg-purple-50 border border-purple-200/80 flex items-center justify-center text-purple-600 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                <Database className="h-4 w-4" />
+            <div className="flex items-start gap-3.5 p-4 rounded-xl bg-white border border-neutral-200/80 shadow-2xs hover:border-primary-200 transition-colors">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200/80 flex items-center justify-center text-primary-600 shrink-0 shadow-2xs">
+                <Wrench className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-bold text-neutral-900 leading-tight">Zero Storage</div>
-                <div className="text-[11px] text-neutral-500 mt-1 leading-snug">No payloads saved</div>
+                <div className="text-sm font-bold text-neutral-900 leading-tight">Useful Developer Tools</div>
+                <div className="text-xs text-neutral-500 mt-0.5 leading-snug">Format, validate, convert, test</div>
               </div>
             </div>
 
-            {/* Card 3: SAP Integration Focused */}
-            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-white border border-neutral-200/80 shadow-2xs hover:border-amber-300 hover:shadow-xs transition-all min-w-0 group">
-              <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-600 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+            <div className="flex items-start gap-3.5 p-4 rounded-xl bg-white border border-neutral-200/80 shadow-2xs hover:border-purple-200 transition-colors">
+              <div className="w-9 h-9 rounded-xl bg-purple-50 border border-purple-200/80 flex items-center justify-center text-purple-600 shrink-0 shadow-2xs">
                 <Layers className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-bold text-neutral-900 leading-tight">SAP Focused</div>
-                <div className="text-[11px] text-neutral-500 mt-1 leading-snug">Real-world use cases</div>
+                <div className="text-sm font-bold text-neutral-900 leading-tight">Real-World Scenarios</div>
+                <div className="text-xs text-neutral-500 mt-0.5 leading-snug">Built for actual development</div>
               </div>
             </div>
 
-            {/* Card 4: Built for Speed */}
-            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-white border border-neutral-200/80 shadow-2xs hover:border-sky-300 hover:shadow-xs transition-all min-w-0 group">
-              <div className="w-8 h-8 rounded-xl bg-sky-50 border border-sky-200/80 flex items-center justify-center text-sky-600 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                <Zap className="h-4 w-4" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-neutral-900 leading-tight">Built for Speed</div>
-                <div className="text-[11px] text-neutral-500 mt-1 leading-snug">Instant results, fast</div>
-              </div>
-            </div>
-
-            {/* Card 5: Developer First */}
-            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-white border border-neutral-200/80 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition-all min-w-0 group">
-              <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200/80 flex items-center justify-center text-indigo-600 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                <Puzzle className="h-4 w-4" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-neutral-900 leading-tight">Developer First</div>
-                <div className="text-[11px] text-neutral-500 mt-1 leading-snug">Practical workflows</div>
-              </div>
-            </div>
-
-            {/* Card 6: Learn by Doing */}
-            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-white border border-neutral-200/80 shadow-2xs hover:border-rose-300 hover:shadow-xs transition-all min-w-0 group">
-              <div className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-200/80 flex items-center justify-center text-rose-600 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+            <div className="flex items-start gap-3.5 p-4 rounded-xl bg-white border border-neutral-200/80 shadow-2xs hover:border-indigo-200 transition-colors">
+              <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200/80 flex items-center justify-center text-indigo-600 shrink-0 shadow-2xs">
                 <Rocket className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-bold text-neutral-900 leading-tight">Learn by Doing</div>
-                <div className="text-[11px] text-neutral-500 mt-1 leading-snug">Hands-on practice</div>
+                <div className="text-sm font-bold text-neutral-900 leading-tight">Developer First</div>
+                <div className="text-xs text-neutral-500 mt-0.5 leading-snug">Fast. Simple. Effective.</div>
               </div>
             </div>
           </div>

@@ -1,67 +1,64 @@
-import { ArrowDown, CheckCircle2, Cpu, FileCode, Layers, ShieldCheck } from 'lucide-react';
+import { ArrowDown, CheckCircle2, Cpu, FileCode, Layers, ShieldCheck, Zap } from 'lucide-react';
 
 export function IntegrationFlowGraphic() {
   return (
-    <div className="relative w-full max-w-lg mx-auto lg:max-w-none">
+    <div className="relative w-full">
       {/* Decorative ambient background glow */}
-      <div className="absolute -inset-1 bg-gradient-to-r from-primary-500/10 via-primary-400/5 to-primary-600/10 rounded-2xl blur-xl -z-10" />
+      <div className="absolute -inset-1.5 bg-gradient-to-tr from-primary-500/10 via-sky-400/10 to-primary-600/10 rounded-2xl blur-xl -z-10 pointer-events-none" />
 
-      {/* Main Terminal / Workbench Card */}
-      <div className="relative rounded-2xl bg-white border border-neutral-200/90 shadow-lg shadow-neutral-900/5 overflow-hidden font-sans">
-        {/* Card Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-neutral-50/90 border-b border-neutral-200/80">
+      {/* Main Terminal Workbench Card */}
+      <div className="rounded-2xl bg-white border border-neutral-200/90 shadow-lg shadow-neutral-900/5 overflow-hidden font-sans">
+        {/* Terminal Header */}
+        <div className="flex items-center justify-between px-4 py-2.5 bg-neutral-50/90 border-b border-neutral-200/80">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-neutral-300" />
             <span className="w-2.5 h-2.5 rounded-full bg-neutral-300" />
             <span className="w-2.5 h-2.5 rounded-full bg-neutral-300" />
-            <span className="ml-2 text-xs font-mono font-medium text-neutral-500">
-              iflow://sap-cpi/inbound-processor.xml
+            <span className="ml-2 text-xs font-mono font-medium text-neutral-500 truncate max-w-[200px] sm:max-w-none">
+              pipeline://sap-cpi/inbound-order.xml
             </span>
           </div>
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/70 text-emerald-700 text-[11px] font-mono font-medium">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/70 text-emerald-700 text-[11px] font-mono font-medium shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Active Trace</span>
+            <span>Trace Active</span>
           </div>
         </div>
 
-        {/* Pipeline Body */}
-        <div className="p-4 sm:p-5 space-y-3 bg-gradient-to-b from-white to-neutral-50/40">
-          {/* Step 1: Inbound Payload */}
-          <div className="group p-3 rounded-xl border border-neutral-200/70 bg-white hover:border-primary-300/80 hover:shadow-xs transition-all duration-150">
+        {/* Pipeline Steps Container */}
+        <div className="p-4 sm:p-5 space-y-2.5 bg-gradient-to-b from-white to-neutral-50/40">
+          {/* Node 1: Inbound Payload */}
+          <div className="p-3 rounded-xl border border-neutral-200/80 bg-white hover:border-primary-200 transition-colors shadow-2xs">
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-md bg-sky-50 border border-sky-200/70 flex items-center justify-center">
-                  <FileCode className="h-3.5 w-3.5 text-sky-600" />
+                <div className="w-6 h-6 rounded-md bg-sky-50 border border-sky-200/60 flex items-center justify-center text-sky-600">
+                  <FileCode className="h-3.5 w-3.5" />
                 </div>
-                <span className="text-xs font-semibold text-neutral-900">1. Inbound Invoicing Payload</span>
+                <span className="text-xs font-semibold text-neutral-900">1. Inbound cXML / IDoc Payload</span>
               </div>
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600 border border-neutral-200/60">
-                cXML / IDoc
+                HTTPS Inbound
               </span>
             </div>
-            <div className="bg-neutral-900 rounded-lg p-2.5 text-[11px] font-mono text-neutral-300 overflow-hidden leading-relaxed shadow-inner">
-              <span className="text-sky-400">&lt;InvoiceDetailRequest&gt;</span>
-              <div className="pl-3 text-neutral-400">
-                &lt;PayloadID&gt;<span className="text-amber-300">INV-2026-0914</span>&lt;/PayloadID&gt;
-              </div>
-              <span className="text-sky-400">&lt;/InvoiceDetailRequest&gt;</span>
+            <div className="bg-neutral-900/95 rounded-lg px-3 py-2 text-[11px] font-mono text-neutral-300 flex items-center justify-between shadow-inner">
+              <span className="truncate text-sky-300">&lt;Invoice doc=&quot;INVOIC02&quot; id=&quot;INV-9014&quot; /&gt;</span>
+              <span className="text-[10px] text-emerald-400 font-medium shrink-0 ml-2">Validated</span>
             </div>
           </div>
 
-          {/* Connector Arrow 1 */}
+          {/* Stem Connector 1 */}
           <div className="flex items-center justify-center py-0.5">
-            <div className="flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-500 text-[10px] font-mono">
+            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-neutral-100/90 border border-neutral-200/70 text-neutral-500 text-[10px] font-mono">
               <ArrowDown className="h-3 w-3 text-primary-600" />
-              <span>Validate &amp; Transform</span>
+              <span>Transform &amp; Map</span>
             </div>
           </div>
 
-          {/* Step 2: CPI Groovy / Transformation Node */}
-          <div className="group p-3 rounded-xl border border-primary-200/80 bg-primary-50/20 hover:border-primary-300 transition-all duration-150">
-            <div className="flex items-center justify-between mb-1.5">
+          {/* Node 2: CPI Runtime Processing */}
+          <div className="p-3 rounded-xl border border-primary-200/80 bg-primary-50/20 shadow-2xs">
+            <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-md bg-primary-100 border border-primary-300/80 flex items-center justify-center">
-                  <Cpu className="h-3.5 w-3.5 text-primary-700" />
+                <div className="w-6 h-6 rounded-md bg-primary-100 border border-primary-300/80 flex items-center justify-center text-primary-700">
+                  <Cpu className="h-3.5 w-3.5" />
                 </div>
                 <span className="text-xs font-semibold text-neutral-900">2. Cloud Integration Pipeline</span>
               </div>
@@ -70,51 +67,51 @@ export function IntegrationFlowGraphic() {
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <div className="flex items-center gap-1.5 p-1.5 rounded-md bg-white border border-neutral-200/80 text-neutral-700">
+              <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-white border border-neutral-200/80 text-neutral-700">
                 <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
-                <span className="truncate">XML Schema (XSD) Valid</span>
+                <span className="truncate">XSD Schema Valid</span>
               </div>
-              <div className="flex items-center gap-1.5 p-1.5 rounded-md bg-white border border-neutral-200/80 text-neutral-700">
+              <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-white border border-neutral-200/80 text-neutral-700">
                 <Layers className="h-3 w-3 text-primary-600 shrink-0" />
                 <span className="truncate">OData Model Map</span>
               </div>
             </div>
           </div>
 
-          {/* Connector Arrow 2 */}
+          {/* Stem Connector 2 */}
           <div className="flex items-center justify-center py-0.5">
-            <div className="flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-500 text-[10px] font-mono">
+            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-neutral-100/90 border border-neutral-200/70 text-neutral-500 text-[10px] font-mono">
               <ArrowDown className="h-3 w-3 text-primary-600" />
               <span>OData Dispatch</span>
             </div>
           </div>
 
-          {/* Step 3: Outbound System Result */}
-          <div className="p-3 rounded-xl border border-emerald-200/80 bg-emerald-50/20">
+          {/* Node 3: Target Output */}
+          <div className="p-3 rounded-xl border border-emerald-200/80 bg-emerald-50/20 shadow-2xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-md bg-emerald-100 border border-emerald-300/80 flex items-center justify-center">
-                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-700" />
+                <div className="w-6 h-6 rounded-md bg-emerald-100 border border-emerald-300/80 flex items-center justify-center text-emerald-700">
+                  <ShieldCheck className="h-3.5 w-3.5" />
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-neutral-900">3. Target: SAP S/4HANA Cloud</div>
                   <div className="text-[10px] text-neutral-500 font-mono">POST /sap/opu/odata4/api_businesspartner/</div>
                 </div>
               </div>
-              <div className="text-right">
+              <div className="text-right shrink-0 ml-2">
                 <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded border border-emerald-200">
                   201 Created
                 </span>
-                <div className="text-[10px] text-neutral-400 font-mono mt-0.5">38ms response</div>
+                <div className="text-[10px] text-neutral-400 font-mono mt-0.5">38ms latency</div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Footer Meta */}
-        <div className="px-4 py-2.5 bg-neutral-50 border-t border-neutral-200/70 flex items-center justify-between text-[11px] text-neutral-500 font-mono">
+        {/* Card Footer Bar */}
+        <div className="px-4 py-2 bg-neutral-50 border-t border-neutral-200/70 flex items-center justify-between text-[11px] text-neutral-500 font-mono">
           <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
+            <Zap className="h-3 w-3 text-primary-600" />
             <span>Browser-Engine Sandbox</span>
           </div>
           <span className="text-neutral-400">Zero Server Uploads</span>

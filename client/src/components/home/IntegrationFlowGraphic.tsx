@@ -133,7 +133,7 @@ export function IntegrationFlowGraphic() {
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
               <span className="ml-2 text-xs font-bold text-neutral-800">Integration Flow</span>
             </div>
-            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[11px] font-medium font-mono">
+            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[11px] font-medium font-mono sm:-translate-x-[200px]">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span>Flow Active</span>
             </div>

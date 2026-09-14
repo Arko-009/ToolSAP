@@ -1,0 +1,25 @@
+{
+  "name": "toolsap",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Learn SAP. Build Faster. Solve Problems.",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently -n client,server -c blue,green \"npm run dev -w client\" \"npm run dev -w server\"",
+    "dev:client": "npm run dev -w client",
+    "dev:server": "npm run dev -w server",
+    "build": "npm run build -w client",
+    "build:server": "npm run build -w server",
+    "lint": "npm run lint -w client",
+    "preview": "npm run preview -w client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

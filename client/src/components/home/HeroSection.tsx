@@ -10,6 +10,8 @@ import {
   Code2,
   Users2,
   Rocket,
+  Puzzle,
+  Database,
 } from 'lucide-react';
 import { Container } from '@/components/layout/Container';
 import { IntegrationFlowGraphic } from './IntegrationFlowGraphic';
@@ -65,8 +67,8 @@ export function HeroSection() {
               </Link>
             </div>
 
-            {/* Trust Indicators (3 items with 2-line text matching mockup) */}
-            <div className="mt-8 pt-6 border-t border-neutral-200/70 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Trust & Value Indicators (6 items in responsive grid) */}
+            <div className="mt-8 pt-6 border-t border-neutral-200/70 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-3.5 gap-y-3.5">
               {/* Item 1 */}
               <div className="flex items-start gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5 shadow-2xs">
@@ -74,18 +76,18 @@ export function HeroSection() {
                 </div>
                 <div>
                   <div className="text-xs font-bold text-neutral-900 leading-tight">100% Client-Side Privacy</div>
-                  <div className="text-[11px] text-neutral-500 mt-0.5">Your data stays in your browser</div>
+                  <div className="text-[11px] text-neutral-500 mt-0.5 leading-tight">Your data stays in your browser</div>
                 </div>
               </div>
 
               {/* Item 2 */}
               <div className="flex items-start gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-purple-50 border border-purple-200/80 flex items-center justify-center text-purple-600 shrink-0 mt-0.5 shadow-2xs">
-                  <Zap className="h-4 w-4" />
+                  <Database className="h-4 w-4" />
                 </div>
                 <div>
                   <div className="text-xs font-bold text-neutral-900 leading-tight">Zero Server Storage</div>
-                  <div className="text-[11px] text-neutral-500 mt-0.5">We don't store your payloads</div>
+                  <div className="text-[11px] text-neutral-500 mt-0.5 leading-tight">We don't store your payloads</div>
                 </div>
               </div>
 
@@ -96,7 +98,40 @@ export function HeroSection() {
                 </div>
                 <div>
                   <div className="text-xs font-bold text-neutral-900 leading-tight">SAP Integration Focused</div>
-                  <div className="text-[11px] text-neutral-500 mt-0.5">Built for real-world use cases</div>
+                  <div className="text-[11px] text-neutral-500 mt-0.5 leading-tight">Built for real-world use cases</div>
+                </div>
+              </div>
+
+              {/* Item 4: Built for Speed */}
+              <div className="flex items-start gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-sky-50 border border-sky-200/80 flex items-center justify-center text-sky-600 shrink-0 mt-0.5 shadow-2xs">
+                  <Zap className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-neutral-900 leading-tight">Built for Speed</div>
+                  <div className="text-[11px] text-neutral-500 mt-0.5 leading-tight">Fast tools, instant results, zero setup</div>
+                </div>
+              </div>
+
+              {/* Item 5: Developer First */}
+              <div className="flex items-start gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200/80 flex items-center justify-center text-indigo-600 shrink-0 mt-0.5 shadow-2xs">
+                  <Puzzle className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-neutral-900 leading-tight">Developer First</div>
+                  <div className="text-[11px] text-neutral-500 mt-0.5 leading-tight">Practical workflows, not complicated documentation</div>
+                </div>
+              </div>
+
+              {/* Item 6: Learn by Doing */}
+              <div className="flex items-start gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-200/80 flex items-center justify-center text-rose-600 shrink-0 mt-0.5 shadow-2xs">
+                  <Rocket className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-neutral-900 leading-tight">Learn by Doing</div>
+                  <div className="text-[11px] text-neutral-500 mt-0.5 leading-tight">Examples, hands-on practice, real SAP scenarios</div>
                 </div>
               </div>
             </div>

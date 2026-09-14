@@ -10,7 +10,7 @@ interface ContainerProps {
 const sizeClasses = {
   sm: 'max-w-4xl',
   md: 'max-w-6xl',
-  lg: 'max-w-7xl',
+  lg: 'max-w-7xl xl:max-w-[1380px] 2xl:max-w-[1440px]',
   full: 'max-w-full',
 };
 

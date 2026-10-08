@@ -1,20 +1,23 @@
 import { useEffect, useRef } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
+import { AnimatedSearchBar } from '@/components/search/AnimatedSearchBar';
 
 interface NavItem {
   label: string;
   to: string;
   icon: LucideIcon;
+  end?: boolean;
 }
 
 interface MobileNavProps {
   isOpen: boolean;
   onClose: () => void;
   items: NavItem[];
+  onOpenSearch?: () => void;
 }
 
-export function MobileNav({ isOpen, onClose, items }: MobileNavProps) {
+export function MobileNav({ isOpen, onClose, items, onOpenSearch }: MobileNavProps) {
   const navRef = useRef<HTMLDivElement>(null);
 
   // Close on escape
@@ -75,12 +78,26 @@ export function MobileNav({ isOpen, onClose, items }: MobileNavProps) {
         aria-label="Mobile navigation"
       >
         <div className="p-4">
+          <div className="mb-4">
+            <AnimatedSearchBar
+              size="md"
+              readOnly
+              placeholder="Search tools & docs..."
+              showShortcut={false}
+              onClick={() => {
+                onClose();
+                onOpenSearch?.();
+              }}
+              className="w-full bg-white shadow-2xs"
+            />
+          </div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 mb-2 px-2">Navigation</p>
           <nav className="flex flex-col gap-1" aria-label="Mobile navigation">
             {items.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
+                end={item.end}
                 onClick={onClose}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors duration-150

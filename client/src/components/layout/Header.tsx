@@ -1,17 +1,45 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { Menu, X, BookOpen, Wrench, Info, Search } from 'lucide-react';
+import { Menu, X, BookOpen, Wrench, Info, Search, Home } from 'lucide-react';
 import { Container } from './Container';
 import { MobileNav } from './MobileNav';
+import { AnimatedSearchBar } from '@/components/search/AnimatedSearchBar';
+import { SearchModal } from '@/components/search/SearchModal';
 
 const navItems = [
+  { label: 'Home', to: '/', icon: Home, end: true },
+  { label: 'Tool', to: '/tools', icon: Wrench },
   { label: 'Learning', to: '/learning', icon: BookOpen },
-  { label: 'Tools', to: '/tools', icon: Wrench },
   { label: 'About', to: '/about', icon: Info },
 ];
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [patternIndex, setPatternIndex] = useState(0);
+  const TOTAL_PATTERNS = 24;
+
+  // Guaranteed dynamic cycle rotation every 4.8s across 24 distinct flight paths
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setPatternIndex((prev) => {
+        const candidates = Array.from({ length: TOTAL_PATTERNS }, (_, i) => i).filter((idx) => idx !== prev);
+        return candidates[Math.floor(Math.random() * candidates.length)];
+      });
+    }, 4800);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <>
@@ -19,18 +47,24 @@ export function Header() {
         <Container>
           <div className="flex items-center justify-between h-16">
             {/* Brand */}
-            <Link to="/" className="flex items-center gap-2.5 group" aria-label="ToolSAP Home">
-              <div className="w-8.5 h-8.5 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-xs group-hover:shadow-sm group-hover:scale-[1.02] transition-all duration-150">
-                <span className="text-white font-mono font-bold text-sm tracking-tighter">TS</span>
-              </div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-base font-bold text-neutral-900 tracking-tight font-sans">
+            <Link to="/" className="flex items-center group" aria-label="ToolSAP Home">
+              <span className="relative inline-flex items-center select-none py-2 px-1.5 -my-2 -mx-1.5 overflow-visible">
+                {/* Base Text Layer */}
+                <span className="text-xl sm:text-2xl font-extrabold text-neutral-900 tracking-tight font-sans">
                   Tool<span className="text-primary-600">SAP</span>
                 </span>
-                <span className="hidden sm:inline-block text-[10px] font-semibold uppercase tracking-wider text-primary-600/80 bg-primary-50 px-1.5 py-0.5 rounded border border-primary-200/60">
-                  Suite
+                {/* Negative Mask Inverted Layer (Randomized Straight, Opposite, Zig-Zag, Snake, Speed, Figure-8) */}
+                <span
+                  key={patternIndex}
+                  className={`jitter-path-${patternIndex} absolute inset-0 flex items-center px-1.5 pointer-events-none select-none bg-neutral-950 dark:bg-white`}
+                  aria-hidden="true"
+                >
+                  <span className="text-xl sm:text-2xl font-extrabold tracking-tight font-sans whitespace-nowrap">
+                    <span className="text-white dark:text-neutral-950">Tool</span>
+                    <span className="text-sky-400 dark:text-primary-600">SAP</span>
+                  </span>
                 </span>
-              </div>
+              </span>
             </Link>
 
             {/* Desktop Navigation */}
@@ -39,6 +73,7 @@ export function Header() {
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  end={item.end}
                   className={({ isActive }) =>
                     `relative flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all duration-150
                     ${isActive
@@ -55,14 +90,14 @@ export function Header() {
 
             {/* Desktop Actions */}
             <div className="hidden md:flex items-center gap-2.5">
-              <button
-                type="button"
-                className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
-                aria-label="Search documentation and tools"
-                title="Search"
-              >
-                <Search className="h-4 w-4" />
-              </button>
+              <AnimatedSearchBar
+                size="sm"
+                readOnly
+                placeholder="Search tools & docs..."
+                showShortcut={true}
+                onClick={() => setSearchOpen(true)}
+                className="w-48 lg:w-56"
+              />
               <Link
                 to="/tools"
                 className="text-xs font-semibold text-neutral-600 hover:text-neutral-900 px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 transition-colors"
@@ -78,21 +113,40 @@ export function Header() {
               </Link>
             </div>
 
-            {/* Mobile menu trigger */}
-            <button
-              className="md:hidden p-2 rounded-lg text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors focus-visible:outline-2 focus-visible:outline-primary-500"
-              onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-              aria-expanded={mobileOpen}
-            >
-              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
+            {/* Mobile Actions & Menu Trigger */}
+            <div className="flex md:hidden items-center gap-1">
+              <button
+                type="button"
+                className="p-2 rounded-lg text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
+                onClick={() => setSearchOpen(true)}
+                aria-label="Open search"
+                title="Search (⌘K)"
+              >
+                <Search className="h-5 w-5" />
+              </button>
+              <button
+                className="p-2 rounded-lg text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors focus-visible:outline-2 focus-visible:outline-primary-500"
+                onClick={() => setMobileOpen(!mobileOpen)}
+                aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={mobileOpen}
+              >
+                {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
+            </div>
           </div>
         </Container>
       </header>
 
       {/* Mobile Navigation */}
-      <MobileNav isOpen={mobileOpen} onClose={() => setMobileOpen(false)} items={navItems} />
+      <MobileNav
+        isOpen={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        items={navItems}
+        onOpenSearch={() => setSearchOpen(true)}
+      />
+
+      {/* Search Modal */}
+      <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   );
 }

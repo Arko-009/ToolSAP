@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import {
   BookOpen,
   Cloud,
@@ -83,8 +82,8 @@ export function LearningHubPage() {
                   className={`group animate-fade-up animate-stagger-${Math.min(index + 1, 5)}`}
                 >
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center shrink-0 group-hover:bg-primary-100 transition-colors">
-                      <IconComponent className="h-5 w-5 text-primary-600" />
+                    <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
+                      <IconComponent className="h-5 w-5 text-emerald-600" />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 mb-1">

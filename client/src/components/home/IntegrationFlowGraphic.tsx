@@ -79,7 +79,7 @@ export function IntegrationFlowGraphic() {
       {/* Main Composition Wrapper */}
       <div className="relative flex items-center">
         {/* Left Tech Node Column (BTP, CPI, API Mgmt, S/4HANA) */}
-        <div className="flex flex-col gap-2.5 z-10 shrink-0 mr-2 sm:mr-3">
+        <div className="relative flex flex-col gap-2.5 z-10 shrink-0 mr-2 sm:mr-3 -translate-x-4 sm:-translate-x-5">
           {/* Node 1: BTP */}
           <div className="group flex flex-col items-center justify-center w-12 sm:w-14 h-12 sm:h-14 rounded-2xl bg-white border border-neutral-200/90 shadow-sm hover:border-primary-300 hover:scale-105 transition-all duration-150">
             <div className="w-6 h-6 rounded-lg bg-sky-50 flex items-center justify-center text-primary-600 mb-0.5">
@@ -111,16 +111,16 @@ export function IntegrationFlowGraphic() {
             </div>
             <span className="text-[9px] font-bold text-neutral-700 font-sans tracking-tight">S/4HANA</span>
           </div>
-        </div>
 
-        {/* Connecting SVG Dotted Lines */}
-        <div className="hidden sm:block absolute left-14 top-8 bottom-8 w-10 pointer-events-none z-0">
-          <svg className="w-full h-full text-primary-300" viewBox="0 0 40 240" fill="none">
-            <path d="M 0 24 C 20 24, 30 110, 40 110" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3" />
-            <path d="M 0 84 C 18 84, 28 115, 40 115" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3" />
-            <path d="M 0 148 C 18 148, 28 125, 40 120" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3" />
-            <path d="M 0 210 C 20 210, 30 130, 40 125" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3" />
-          </svg>
+          {/* Connecting SVG Dotted Lines Anchored Directly to the 4 Nodes */}
+          <div className="hidden sm:block absolute left-full top-0 h-full w-[46px] pointer-events-none z-0">
+            <svg className="w-full h-full text-primary-300 overflow-visible" viewBox="0 0 46 254" fill="none">
+              <path d="M 0 28 C 22 28, 32 112, 46 112" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3" />
+              <path d="M 0 94 C 20 94, 30 118, 46 118" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3" />
+              <path d="M 0 160 C 20 160, 30 124, 46 124" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3" />
+              <path d="M 0 226 C 22 226, 32 130, 46 130" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3" />
+            </svg>
+          </div>
         </div>
 
         {/* Main Layer 1: White "Integration Flow" Canvas Card */}

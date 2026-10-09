@@ -3,14 +3,24 @@ import { ArrowRight, BookOpen, Wrench, Check } from 'lucide-react';
 import { Container } from '@/components/layout/Container';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
 import { GlowingCards, GlowingCard } from '@/components/ui/GlowingCards';
+import { CosmicDust } from '@/components/ui/CosmicDust';
 
 export function PillarsSection() {
   const [headerRef, headerVisible] = useScrollReveal<HTMLDivElement>();
   const [columnsRef, columnsVisible] = useScrollReveal<HTMLDivElement>(0.08);
 
   return (
-    <section className="py-20 sm:py-28 lg:py-32 bg-white section-divider border-b border-neutral-200/60">
-      <Container>
+    <section className="relative py-20 sm:py-28 lg:py-32 bg-white section-divider border-b border-neutral-200/60 overflow-hidden">
+      {/* Lightswind Interactive Cosmic Dust Stardust Vortex Background */}
+      <CosmicDust
+        particleCount={120}
+        speedMultiplier={0.85}
+        particleSize={1.5}
+        connectParticles={true}
+        className="z-0"
+      />
+
+      <Container className="relative z-10">
         {/* Section Header — Clean & Calm */}
         <div
           ref={headerRef}

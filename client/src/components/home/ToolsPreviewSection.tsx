@@ -15,6 +15,7 @@ import { Container } from '@/components/layout/Container';
 import { tools } from '@/data/tools';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
 import { CapsuleButton } from '@/components/common/CapsuleButton';
+import { LoadMoreToolsButton } from '@/components/ui/LoadMoreToolsButton';
 
 const iconMap: Record<string, React.ElementType> = {
   FileCode,
@@ -74,7 +75,7 @@ export function ToolsPreviewSection() {
             to="/tools"
             className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-neutral-700 bg-white border border-neutral-200 rounded-lg hover:border-neutral-300 hover:text-primary-600 transition-all duration-150 shadow-2xs self-start md:self-auto shrink-0"
           >
-            <span>View All 6 Tools</span>
+            <span>View All Tools</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -133,6 +134,15 @@ export function ToolsPreviewSection() {
               </div>
             );
           })}
+        </div>
+
+        {/* Big Load More Tools Action */}
+        <div className="mt-12 sm:mt-16">
+          <LoadMoreToolsButton
+            to="/tools"
+            label="Load More Tools"
+            subtext="Access the complete toolkit of formatters, converters, and payload generators"
+          />
         </div>
       </Container>
     </section>

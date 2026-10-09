@@ -1,17 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Link, NavLink } from 'react-router-dom';
-import { Menu, X, BookOpen, Wrench, Info, Search, Home } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Menu, X, Search } from 'lucide-react';
 import { Container } from './Container';
 import { MobileNav } from './MobileNav';
+import { NavDock, navItems } from './NavDock';
 import { AnimatedSearchBar } from '@/components/search/AnimatedSearchBar';
 import { SearchModal } from '@/components/search/SearchModal';
-
-const navItems = [
-  { label: 'Home', to: '/', icon: Home, end: true },
-  { label: 'Tool', to: '/tools', icon: Wrench },
-  { label: 'Learning', to: '/learning', icon: BookOpen },
-  { label: 'About', to: '/about', icon: Info },
-];
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -67,26 +61,8 @@ export function Header() {
               </span>
             </Link>
 
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-1 bg-neutral-100/70 p-1 rounded-lg border border-neutral-200/50" aria-label="Primary navigation">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  className={({ isActive }) =>
-                    `relative flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all duration-150
-                    ${isActive
-                      ? 'text-neutral-900 bg-white shadow-xs'
-                      : 'text-neutral-600 hover:text-neutral-900 hover:bg-white/50'
-                    }`
-                  }
-                >
-                  <item.icon className="h-3.5 w-3.5" aria-hidden="true" />
-                  {item.label}
-                </NavLink>
-              ))}
-            </nav>
+            {/* Desktop Navigation - Lightswind Proximity Animated Dock */}
+            <NavDock />
 
             {/* Desktop Actions */}
             <div className="hidden md:flex items-center gap-2.5">

@@ -102,6 +102,7 @@ export function RippleButton({
         <button
           type="button"
           onMouseDown={handlePointerDown}
+          onClick={onClick}
           className={baseClasses}
           aria-label={text}
         >

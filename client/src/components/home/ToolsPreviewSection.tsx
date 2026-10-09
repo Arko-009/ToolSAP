@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileCode,
   FileCheck,
@@ -10,6 +12,12 @@ import {
   Wrench,
   Shield,
   Code2,
+  Terminal,
+  Binary,
+  Key,
+  Layers,
+  Globe,
+  Clock,
 } from 'lucide-react';
 import { Container } from '@/components/layout/Container';
 import { tools } from '@/data/tools';
@@ -24,6 +32,12 @@ const iconMap: Record<string, React.ElementType> = {
   ArrowLeftRight,
   Search,
   Wand2,
+  Terminal,
+  Binary,
+  Key,
+  Layers,
+  Globe,
+  Clock,
 };
 
 const formatTagMap: Record<string, string> = {
@@ -31,14 +45,32 @@ const formatTagMap: Record<string, string> = {
   'xml-validator': 'XML · XSD SCHEMAS',
   'xml-to-xsd': 'XSD GENERATOR',
   'json-xml-converter': 'JSON ↔ XML',
+  'json-xml': 'JSON ↔ XML',
   'xpath-tester': 'XPATH 1.0 / 2.0',
   'xslt-generator': 'XSLT MAPPING',
+  'groovy-tester': 'GROOVY · CPI',
+  'base64-codec': 'BASE64 · AUTH',
+  'jwt-decoder': 'JWT · BTP OAUTH',
+  'cpi-property-simulator': 'CAMEL HEADERS',
+  'url-codec': 'URL · ODATA FILTER',
+  'cron-parser': 'QUARTZ · TIMER',
 };
 
 export function ToolsPreviewSection() {
+  const [visibleCount, setVisibleCount] = useState(6);
   const [sectionRef, isSectionInView] = useScrollReveal<HTMLElement>(0.15, '-40px 0px -40px 0px', false);
   const [headerRef, headerVisible] = useScrollReveal<HTMLDivElement>();
   const [gridRef, gridVisible] = useScrollReveal<HTMLDivElement>(0.05);
+
+  const isExpanded = visibleCount >= tools.length;
+
+  const handleToggleTools = () => {
+    if (isExpanded) {
+      setVisibleCount(6);
+    } else {
+      setVisibleCount(tools.length);
+    }
+  };
 
   return (
     <section
@@ -85,15 +117,13 @@ export function ToolsPreviewSection() {
           ref={gridRef}
           className={`grid sm:grid-cols-2 lg:grid-cols-3 gap-5 stagger-children ${gridVisible ? 'reveal-visible' : ''}`}
         >
-          {tools.map((tool) => {
+          {tools.slice(0, visibleCount).map((tool, index) => {
             const IconComponent = iconMap[tool.icon] || Code2;
             const formatTag = formatTagMap[tool.id] || 'TOOL';
+            const isNewlyLoaded = index >= 6;
 
-            return (
-              <div
-                key={tool.id}
-                className="tool-card-interactive group relative rounded-xl bg-white border border-neutral-200/90 p-5 shadow-xs flex flex-col justify-between"
-              >
+            const cardInner = (
+              <>
                 <div>
                   {/* Card Top Metadata */}
                   <div className="flex items-center justify-between mb-4">
@@ -131,6 +161,33 @@ export function ToolsPreviewSection() {
                     label={tool.status === 'available' ? 'Launch' : 'Inspect'}
                   />
                 </div>
+              </>
+            );
+
+            if (isNewlyLoaded) {
+              return (
+                <motion.div
+                  key={tool.id}
+                  initial={{ opacity: 0, y: 32, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{
+                    duration: 0.45,
+                    delay: (index - 6) * 0.08,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                  className="tool-card-interactive group relative rounded-xl bg-white border border-neutral-200/90 p-5 shadow-xs flex flex-col justify-between"
+                >
+                  {cardInner}
+                </motion.div>
+              );
+            }
+
+            return (
+              <div
+                key={tool.id}
+                className="tool-card-interactive group relative rounded-xl bg-white border border-neutral-200/90 p-5 shadow-xs flex flex-col justify-between"
+              >
+                {cardInner}
               </div>
             );
           })}
@@ -139,8 +196,8 @@ export function ToolsPreviewSection() {
         {/* Load More Tools Action */}
         <div className="mt-10 sm:mt-12">
           <RippleButton
-            to="/tools"
-            text="Load More Tools"
+            onClick={handleToggleTools}
+            text={isExpanded ? 'Show Less' : 'Load More Tools'}
           />
         </div>
       </Container>

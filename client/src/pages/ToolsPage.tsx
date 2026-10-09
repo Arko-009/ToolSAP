@@ -9,6 +9,12 @@ import {
   Wand2,
   Shield,
   ArrowRight,
+  Terminal,
+  Binary,
+  Key,
+  Layers,
+  Globe,
+  Clock,
 } from 'lucide-react';
 import { SEOHead } from '@/components/common/SEOHead';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -25,6 +31,12 @@ const toolIconMap: Record<string, React.ElementType> = {
   ArrowLeftRight,
   Search,
   Wand2,
+  Terminal,
+  Binary,
+  Key,
+  Layers,
+  Globe,
+  Clock,
 };
 
 export function ToolsPage() {

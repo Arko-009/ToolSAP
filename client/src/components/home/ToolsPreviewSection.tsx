@@ -126,8 +126,8 @@ export function ToolsPreviewSection() {
                     <span>In-Browser</span>
                   </div>
                   <CapsuleButton
-                    to={`/tools#${tool.id}`}
-                    label="Inspect"
+                    to={tool.status === 'available' ? `/tools/${tool.slug}` : `/tools#${tool.id}`}
+                    label={tool.status === 'available' ? 'Launch' : 'Inspect'}
                   />
                 </div>
               </div>

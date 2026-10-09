@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import {
   Code2,
   FileCode,
@@ -63,40 +64,69 @@ export function ToolsPage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {tools.map((tool, index) => {
               const IconComponent = toolIconMap[tool.icon] || Code2;
+              const isAvailable = tool.status === 'available';
+
               return (
                 <Card
                   key={tool.id}
                   hover
                   padding="lg"
-                  className={`group animate-fade-up animate-stagger-${Math.min(index + 1, 5)}`}
+                  className={`group animate-fade-up animate-stagger-${Math.min(index + 1, 5)} flex flex-col justify-between`}
                 >
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="w-11 h-11 rounded-xl bg-primary-50 flex items-center justify-center shrink-0 group-hover:bg-primary-100 transition-colors">
-                      <IconComponent className="h-5 w-5 text-primary-600" />
+                  <div>
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="w-11 h-11 rounded-xl bg-primary-50 flex items-center justify-center shrink-0 group-hover:bg-primary-100 transition-colors">
+                        <IconComponent className="h-5 w-5 text-primary-600" />
+                      </div>
+                      <div>
+                        {isAvailable ? (
+                          <Link to={`/tools/${tool.slug}`} className="group-hover:text-primary-600 transition-colors">
+                            <h3 className="text-base font-semibold text-neutral-900">{tool.name}</h3>
+                          </Link>
+                        ) : (
+                          <h3 className="text-base font-semibold text-neutral-900">{tool.name}</h3>
+                        )}
+                        {isAvailable ? (
+                          <Badge variant="success" size="sm" className="mt-1" dot>
+                            Available
+                          </Badge>
+                        ) : (
+                          <Badge variant="coming-soon" size="sm" className="mt-1">
+                            Coming Soon
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-base font-semibold text-neutral-900">{tool.name}</h3>
-                      <Badge variant="coming-soon" size="sm" className="mt-1">Coming Soon</Badge>
+                    <p className="text-sm text-neutral-600 leading-relaxed mb-4">
+                      {tool.description}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mb-4">
+                      {tool.features.slice(0, 3).map((feature) => (
+                        <span
+                          key={feature}
+                          className="inline-flex items-center px-2 py-0.5 text-xs text-neutral-500 bg-neutral-100 rounded"
+                        >
+                          {feature}
+                        </span>
+                      ))}
                     </div>
                   </div>
-                  <p className="text-sm text-neutral-600 leading-relaxed mb-4">
-                    {tool.description}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5 mb-4">
-                    {tool.features.slice(0, 3).map((feature) => (
-                      <span
-                        key={feature}
-                        className="inline-flex items-center px-2 py-0.5 text-xs text-neutral-500 bg-neutral-100 rounded"
+
+                  <div className="pt-3 border-t border-neutral-100 mt-2 flex items-center justify-between">
+                    {isAvailable ? (
+                      <Link
+                        to={`/tools/${tool.slug}`}
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-600 hover:text-primary-700 transition-colors"
                       >
-                        {feature}
+                        <span>Open Tool</span>
+                        <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
+                      </Link>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-sm font-medium text-neutral-400 cursor-default">
+                        Available soon
+                        <ArrowRight className="h-3.5 w-3.5" />
                       </span>
-                    ))}
-                  </div>
-                  <div className="pt-3 border-t border-neutral-100">
-                    <span className="inline-flex items-center gap-1 text-sm font-medium text-neutral-400 cursor-default">
-                      Available soon
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </span>
+                    )}
                   </div>
                 </Card>
               );

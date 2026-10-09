@@ -3100,6 +3100,8 @@ img {
 
 /* ── 12. 4-STATE CAPSULE "INSPECT" BUTTON ──────────────────── */
 .capsule-inspect-btn {
+  position: relative;
+  z-index: 2;
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -3275,6 +3277,14 @@ img {
 
 .capsule-btn-emerald:hover .capsule-arc {
   stroke: #047857;
+}
+
+.capsule-btn-emerald:hover .capsule-arc-top {
+  transform: rotate(270deg);
+}
+
+.capsule-btn-emerald:hover .capsule-arc-bottom {
+  transform: rotate(0deg);
 }
 
 .capsule-btn-emerald:hover .capsule-inspect-arrow {

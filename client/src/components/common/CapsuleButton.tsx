@@ -21,8 +21,8 @@ export function CapsuleButton({
       to={to}
       className={`capsule-inspect-btn ${variantClass} ${className}`.trim()}
     >
-      <span>{label}</span>
-      <span className="capsule-inspect-circle" aria-hidden="true">
+      <span className="pointer-events-none">{label}</span>
+      <span className="capsule-inspect-circle pointer-events-none" aria-hidden="true">
         <svg
           className="capsule-inspect-svg"
           viewBox="0 0 24 24"

@@ -9,11 +9,11 @@ export const tools: Tool[] = [
     description: 'Format and beautify XML documents with proper indentation and syntax highlighting. Essential for reading and debugging SAP integration payloads, IDoc XML, and SOAP messages.',
     shortDescription: 'Format and beautify XML with proper indentation.',
     icon: 'FileCode',
-    status: 'coming-soon',
+    status: 'available',
     priority: 'p0',
     relatedLessons: ['message-transformation'],
     relatedTools: ['xml-validator', 'xml-to-xsd'],
-    features: ['Pretty print', 'Minify', 'Syntax highlighting', 'Copy output', 'Download'],
+    features: ['Pretty print', 'Safe minify', 'Syntax highlighting', 'Copy & Download', 'In-browser privacy'],
     seo: {
       title: 'XML Formatter — Format & Beautify XML Online | ToolSAP',
       description: 'Free online XML formatter and beautifier. Format SAP integration payloads, IDoc XML, and SOAP messages with proper indentation.',

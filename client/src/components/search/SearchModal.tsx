@@ -68,8 +68,8 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
         title: t.name,
         description: t.description || t.shortDescription,
         type: 'tool',
-        url: `/tools`,
-        badge: t.status === 'coming-soon' ? 'Coming Soon' : 'Free Tool',
+        url: t.status === 'available' ? `/tools/${t.slug}` : `/tools`,
+        badge: t.status === 'coming-soon' ? 'Coming Soon' : 'Available',
         icon: Wrench,
       });
     });

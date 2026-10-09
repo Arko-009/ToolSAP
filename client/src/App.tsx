@@ -9,6 +9,7 @@ import { LoadingState } from '@/components/common/LoadingState';
 const HomePage = lazy(() => import('@/pages/HomePage').then((m) => ({ default: m.HomePage })));
 const LearningHubPage = lazy(() => import('@/pages/LearningHubPage').then((m) => ({ default: m.LearningHubPage })));
 const ToolsPage = lazy(() => import('@/pages/ToolsPage').then((m) => ({ default: m.ToolsPage })));
+const XmlFormatterPage = lazy(() => import('@/pages/XmlFormatterPage').then((m) => ({ default: m.XmlFormatterPage })));
 const AboutPage = lazy(() => import('@/pages/AboutPage').then((m) => ({ default: m.AboutPage })));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
@@ -52,6 +53,14 @@ export function App() {
                 element={
                   <Suspense fallback={<PageLoader />}>
                     <ToolsPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="tools/xml-formatter"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <XmlFormatterPage />
                   </Suspense>
                 }
               />

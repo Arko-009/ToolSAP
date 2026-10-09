@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://toolsap.com/sitemap.xml
+Sitemap: https://tool-sap.vercel.app/sitemap.xml

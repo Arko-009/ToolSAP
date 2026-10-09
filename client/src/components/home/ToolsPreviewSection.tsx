@@ -15,7 +15,7 @@ import { Container } from '@/components/layout/Container';
 import { tools } from '@/data/tools';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
 import { CapsuleButton } from '@/components/common/CapsuleButton';
-import { LoadMoreToolsButton } from '@/components/ui/LoadMoreToolsButton';
+import { RippleButton } from '@/components/ui/RippleButton';
 
 const iconMap: Record<string, React.ElementType> = {
   FileCode,
@@ -136,12 +136,11 @@ export function ToolsPreviewSection() {
           })}
         </div>
 
-        {/* Big Load More Tools Action */}
-        <div className="mt-12 sm:mt-16">
-          <LoadMoreToolsButton
+        {/* Load More Tools Action */}
+        <div className="mt-10 sm:mt-12">
+          <RippleButton
             to="/tools"
-            label="Load More Tools"
-            subtext="Access the complete toolkit of formatters, converters, and payload generators"
+            text="Load More Tools"
           />
         </div>
       </Container>

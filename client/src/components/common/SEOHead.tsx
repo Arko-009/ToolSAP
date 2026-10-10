@@ -23,7 +23,7 @@ export function SEOHead({
   keywords,
   noIndex = false,
 }: SEOHeadProps) {
-  const fullTitle = title === SITE_NAME ? title : `${title} | ${SITE_NAME}`;
+  const fullTitle = title.includes(SITE_NAME) ? title : `${title} | ${SITE_NAME}`;
   const canonicalUrl = canonical ? `${BASE_URL}${canonical}` : undefined;
 
   return (

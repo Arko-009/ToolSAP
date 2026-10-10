@@ -54,7 +54,7 @@ export function Breadcrumbs({ items, className = '' }: BreadcrumbsProps) {
               '@type': 'ListItem',
               position: index + 1,
               name: item.label,
-              item: item.href ? `https://toolsap.com${item.href}` : undefined,
+              item: item.href ? `https://tool-sap.vercel.app${item.href}` : undefined,
             })),
         })}
       </script>

@@ -11,7 +11,7 @@ interface SEOHeadProps {
 }
 
 const SITE_NAME = 'ToolSAP';
-const DEFAULT_OG_IMAGE = '/og-default.png';
+const DEFAULT_OG_IMAGE = '/ToolSap-Favicon.png';
 const BASE_URL = 'https://tool-sap.vercel.app';
 
 export function SEOHead({

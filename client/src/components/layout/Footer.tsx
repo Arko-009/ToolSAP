@@ -113,9 +113,11 @@ export function Footer() {
                 ==================================================== */}
             <div className="lg:col-span-4">
               <Link to="/" className="flex items-center gap-2.5 mb-4 group inline-flex">
-                <div className="w-8 h-8 rounded-xl bg-primary-600 flex items-center justify-center text-white font-bold text-base shadow-xs group-hover:scale-105 transition-transform duration-200">
-                  T
-                </div>
+                <img
+                  src="/ToolSap-Favicon.png"
+                  alt="ToolSAP Logo"
+                  className="w-8 h-8 rounded-lg object-contain group-hover:scale-105 transition-transform duration-200"
+                />
                 <span className="text-xl font-bold text-neutral-900 tracking-tight">
                   ToolSAP
                 </span>

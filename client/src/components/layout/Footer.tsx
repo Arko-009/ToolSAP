@@ -112,14 +112,9 @@ export function Footer() {
                 Column 1: Brand & Positioning (4 cols)
                 ==================================================== */}
             <div className="lg:col-span-4">
-              <Link to="/" className="flex items-center gap-2.5 mb-4 group inline-flex">
-                <img
-                  src="/ToolSap-Favicon.png"
-                  alt="ToolSAP Logo"
-                  className="w-8 h-8 rounded-lg object-contain group-hover:scale-105 transition-transform duration-200"
-                />
-                <span className="text-xl font-bold text-neutral-900 tracking-tight">
-                  ToolSAP
+              <Link to="/" className="inline-flex items-center mb-4 group" aria-label="ToolSAP Home">
+                <span className="text-2xl font-extrabold text-neutral-900 tracking-tight font-sans group-hover:opacity-85 transition-opacity">
+                  Tool<span className="text-primary-600">SAP</span>
                 </span>
               </Link>
 

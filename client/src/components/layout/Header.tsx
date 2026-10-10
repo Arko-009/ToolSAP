@@ -41,12 +41,7 @@ export function Header() {
         <Container>
           <div className="flex items-center justify-between h-16">
             {/* Brand */}
-            <Link to="/" className="flex items-center gap-2.5 group" aria-label="ToolSAP Home">
-              <img
-                src="/ToolSap-Favicon.png"
-                alt="ToolSAP"
-                className="w-8 h-8 object-contain group-hover:scale-105 transition-transform duration-200"
-              />
+            <Link to="/" className="flex items-center group" aria-label="ToolSAP Home">
               <span className="relative inline-flex items-center select-none py-2 px-1.5 -my-2 -mx-1.5 overflow-visible">
                 {/* Base Text Layer */}
                 <span className="text-xl sm:text-2xl font-extrabold text-neutral-900 tracking-tight font-sans">

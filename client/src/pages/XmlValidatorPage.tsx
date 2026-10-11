@@ -789,22 +789,7 @@ export function XmlValidatorPage() {
               )}
             </Card>
 
-            {/* Quick Actions & Navigation Callout */}
-            <Card padding="md" className="border-neutral-200 bg-neutral-50/50 shadow-2xs">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-xs font-semibold text-neutral-900">Need XML Beautification?</h4>
-                  <p className="text-[11px] text-neutral-600 mt-0.5">
-                    Format and re-indent this payload with customizable tab width.
-                  </p>
-                </div>
-                <Link to="/tools/xml-formatter">
-                  <Button variant="secondary" size="sm" icon={<FileCode className="h-3.5 w-3.5" />}>
-                    Open Formatter
-                  </Button>
-                </Link>
-              </div>
-            </Card>
+
           </div>
         }
         infoSection={

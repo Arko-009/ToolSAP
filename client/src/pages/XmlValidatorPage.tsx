@@ -449,14 +449,6 @@ export function XmlValidatorPage() {
                   <span className="text-[11px] text-neutral-400 font-mono">({activeFileName})</span>
                 )}
               </div>
-
-              <div className="flex items-center gap-2.5 text-xs text-neutral-500 font-mono">
-                <span>{linesCount.toLocaleString()} lines</span>
-                <span>•</span>
-                <span>{charCount.toLocaleString()} chars</span>
-                <span>•</span>
-                <span>{(sizeBytes / 1024).toFixed(1)} KB</span>
-              </div>
             </div>
 
             {/* Editor Area */}
@@ -486,6 +478,20 @@ export function XmlValidatorPage() {
                   <p className="text-xs text-primary-700">Supported: .xml, .xsd, .wsdl, .soap</p>
                 </div>
               )}
+            </div>
+
+            {/* Editor Bottom Evaluation Bar */}
+            <div className="flex items-center justify-between px-4 py-2 bg-neutral-50/80 border-t border-neutral-200 text-xs text-neutral-500 font-mono">
+              <span className="text-[11px] text-neutral-400 font-sans font-medium">
+                {validationMode === 'xsd' && activeTab === 'xsd' ? 'Schema Definition' : 'Input Payload'}
+              </span>
+              <div className="flex items-center gap-2.5">
+                <span>{linesCount.toLocaleString()} lines</span>
+                <span>•</span>
+                <span>{charCount.toLocaleString()} chars</span>
+                <span>•</span>
+                <span>{(sizeBytes / 1024).toFixed(1)} KB</span>
+              </div>
             </div>
           </div>
         }

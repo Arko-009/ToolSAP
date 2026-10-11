@@ -272,6 +272,49 @@ function categorizeError(rawError: string): {
   };
 }
 
+export interface DtdInfo {
+  rootName: string;
+  elements: Map<string, { rawModel: string; allowedChildren: string[]; isPcData: boolean }>;
+  attributes: Map<string, Map<string, { type: string; defaultDecl: string }>>;
+}
+
+/**
+ * Parses internal DTD subset from <!DOCTYPE ... [...]>
+ */
+export function parseDtd(xml: string): DtdInfo | null {
+  const doctypeMatch = xml.match(/<!DOCTYPE\s+([a-zA-Z0-9_.:-]+)(?:\s+\[([\s\S]*?)\])?\s*>/i);
+  if (!doctypeMatch) return null;
+
+  const rootName = doctypeMatch[1];
+  const subset = doctypeMatch[2] || '';
+  const elements = new Map<string, { rawModel: string; allowedChildren: string[]; isPcData: boolean }>();
+  const attributes = new Map<string, Map<string, { type: string; defaultDecl: string }>>();
+
+  const elemRegex = /<!ELEMENT\s+([a-zA-Z0-9_.:-]+)\s+([^>]+)>/gi;
+  let em: RegExpExecArray | null;
+  while ((em = elemRegex.exec(subset)) !== null) {
+    const elemName = em[1];
+    const rawModel = em[2].trim();
+    const isPcData = rawModel.includes('#PCDATA');
+    const childMatches = rawModel.match(/[a-zA-Z_][a-zA-Z0-9_.:-]*/g) || [];
+    const allowedChildren = childMatches.filter((c) => !['EMPTY', 'ANY', 'PCDATA'].includes(c));
+    elements.set(elemName, { rawModel, allowedChildren, isPcData });
+  }
+
+  const attrRegex = /<!ATTLIST\s+([a-zA-Z0-9_.:-]+)\s+([a-zA-Z0-9_.:-]+)\s+([^\s>]+)\s+([^>]+)>/gi;
+  let am: RegExpExecArray | null;
+  while ((am = attrRegex.exec(subset)) !== null) {
+    const elemName = am[1];
+    const attrName = am[2];
+    const type = am[3];
+    const defaultDecl = am[4].trim();
+    if (!attributes.has(elemName)) attributes.set(elemName, new Map());
+    attributes.get(elemName)!.set(attrName, { type, defaultDecl });
+  }
+
+  return { rootName, elements, attributes };
+}
+
 interface TagStackItem {
   name: string;
   line: number;
@@ -286,6 +329,8 @@ interface TagStackItem {
 export function scanXmlErrors(xml: string): XmlValidationError[] {
   const errors: XmlValidationError[] = [];
   const stack: TagStackItem[] = [];
+  const dtd = parseDtd(xml);
+  const seenIds = new Set<string>();
   let rootElementCount = 0;
   let rootClosed = false;
 
@@ -588,6 +633,59 @@ export function scanXmlErrors(xml: string): XmlValidationError[] {
           category: 'syntax-error',
           suggestion: `In XML, all attribute values must be enclosed in double quotes (e.g., ${attrName}="${attrVal}").`,
         });
+      }
+
+      // Check for XML ID uniqueness across document
+      const idAttrRegex = /\bid\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
+      let idMatch: RegExpExecArray | null;
+      while ((idMatch = idAttrRegex.exec(tagContent)) !== null) {
+        const idVal = idMatch[1] ?? idMatch[2];
+        if (idVal) {
+          if (seenIds.has(idVal)) {
+            const attrOffset = i + 1 + tagName.length + idMatch.index;
+            const attrLoc = offsetToLineCol(xml, attrOffset);
+            errors.push({
+              message: `Duplicate XML ID '${idVal}' found on line ${attrLoc.line}. An XML ID attribute must be unique throughout the document.`,
+              line: attrLoc.line,
+              column: attrLoc.column,
+              snippet: generateSnippet(xml, attrLoc.line, attrLoc.column),
+              category: 'syntax-error',
+              suggestion: `Two elements share the same ID '${idVal}'. Change '${idVal}' to a unique identifier.`,
+            });
+          } else {
+            seenIds.add(idVal);
+          }
+        }
+      }
+
+      // Check DTD namespace prefix and unexpected elements
+      if (dtd) {
+        if (tagName.includes(':')) {
+          const [prefix, localName] = tagName.split(':');
+          if (dtd.elements.has(localName) && !dtd.elements.has(tagName)) {
+            errors.push({
+              message: `Element '<${tagName}>' on line ${startLoc.line} uses namespace prefix '${prefix}:', but DTD declares '<${localName}>' without a prefix. DTD validation does not treat these names as equivalent.`,
+              line: startLoc.line,
+              column: startLoc.column,
+              snippet: generateSnippet(xml, startLoc.line, startLoc.column),
+              category: 'syntax-error',
+              suggestion: `Remove '${prefix}:' prefix to match DTD declaration <${localName}>, or declare <!ELEMENT ${tagName} ...> in DTD.`,
+            });
+          }
+        }
+
+        const localTag = tagName.includes(':') ? tagName.split(':')[1] : tagName;
+        if (!dtd.elements.has(tagName) && !dtd.elements.has(localTag) && tagName !== dtd.rootName) {
+          const parentName = stack.length > 0 ? stack[stack.length - 1].name : dtd.rootName;
+          errors.push({
+            message: `Unexpected element '<${tagName}>' on line ${startLoc.line} is not declared in the DTD, and <${parentName}> content model does not permit it.`,
+            line: startLoc.line,
+            column: startLoc.column,
+            snippet: generateSnippet(xml, startLoc.line, startLoc.column),
+            category: 'syntax-error',
+            suggestion: `Remove '<${tagName}>' from the document or declare <!ELEMENT ${tagName} ...> in the DTD.`,
+          });
+        }
       }
 
       if (!isSelfClosing) {
@@ -1013,6 +1111,77 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
       result = `${result}\n]]>`;
       passFixes.push("Closed unterminated CDATA with ']]>'");
     }
+
+    // 5b. DTD Namespace Prefix Alignment & Unexpected Element Fix
+    const dtd = parseDtd(result);
+    if (dtd) {
+      // 5b-1. Remove namespace prefixes from elements when DTD declared them without prefix
+      for (const [declaredElem] of dtd.elements) {
+        const prefixedRegex = new RegExp(`(<|</)([a-zA-Z0-9_.:-]+):(${declaredElem})([\\s>/])`, 'g');
+        if (prefixedRegex.test(result)) {
+          result = result.replace(prefixedRegex, (_m, p1, _prefix, local, p4) => {
+            return `${p1}${local}${p4}`;
+          });
+          passFixes.push(`Removed undeclared namespace prefix from <${declaredElem}> elements to match DTD declaration`);
+        }
+      }
+
+      // 5b-2. Remove unexpected elements not declared in DTD
+      const allDeclared = new Set(dtd.elements.keys());
+      allDeclared.add(dtd.rootName);
+
+      const tagMatches = Array.from(result.matchAll(/<([a-zA-Z_][a-zA-Z0-9_.:-]*)(\s[^>]*)?>/g));
+      const undeclaredTags = new Set<string>();
+      for (const tm of tagMatches) {
+        const tag = tm[1];
+        if (!allDeclared.has(tag) && !tag.startsWith('?') && !tag.startsWith('!')) {
+          undeclaredTags.add(tag);
+        }
+      }
+
+      for (const tag of undeclaredTags) {
+        const blockRegex = new RegExp(`^[ \\t]*<${tag}(\\s[^>]*)?>[\\s\\S]*?<\\/${tag}>[ \\t]*\\r?\\n?`, 'gmi');
+        if (blockRegex.test(result)) {
+          result = result.replace(blockRegex, '');
+          passFixes.push(`Removed unexpected element <${tag}> not declared in DTD`);
+        }
+      }
+    }
+
+    // 5c. Deduplicate XML IDs across document
+    const idRegex = /(\bid\s*=\s*["'])([^"']+)(["'])/gi;
+    const allIds: string[] = [];
+    let im: RegExpExecArray | null;
+    while ((im = idRegex.exec(result)) !== null) {
+      allIds.push(im[2]);
+    }
+
+    const seenIdsForFix = new Set<string>();
+    result = result.replace(idRegex, (full, p1, val, p3) => {
+      if (seenIdsForFix.has(val)) {
+        let newId = val;
+        const numMatch = val.match(/\d+$/);
+        if (numMatch) {
+          const numStr = numMatch[0];
+          let num = parseInt(numStr, 10);
+          do {
+            num++;
+            newId = val.substring(0, val.length - numStr.length) + String(num).padStart(numStr.length, '0');
+          } while (allIds.includes(newId) || seenIdsForFix.has(newId));
+        } else {
+          let count = 2;
+          do {
+            newId = `${val}_${count++}`;
+          } while (allIds.includes(newId) || seenIdsForFix.has(newId));
+        }
+        seenIdsForFix.add(newId);
+        passFixes.push(`Changed duplicate ID '${val}' to unique ID '${newId}'`);
+        return `${p1}${newId}${p3}`;
+      } else {
+        seenIdsForFix.add(val);
+        return full;
+      }
+    });
 
     // 6. Scan structural errors
     const scannedErrors = scanXmlErrors(result);

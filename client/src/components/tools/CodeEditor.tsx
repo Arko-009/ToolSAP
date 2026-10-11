@@ -16,6 +16,9 @@ export interface CodeEditorProps {
   hasError?: boolean;
 }
 
+// Cute light-orange custom text cursor SVG data URI
+const CUTE_ORANGE_IBEAM = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='24' viewBox='0 0 16 24' fill='none'%3E%3Cpath d='M4 3h8M8 3v18M4 21h8' stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.85'/%3E%3Cpath d='M4 3h8M8 3v18M4 21h8' stroke='%23f97316' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 8 12, text`;
+
 // Custom crisp theme tailored to ToolSAP's developer palette
 const editorTheme = EditorView.theme({
   '&': {
@@ -27,21 +30,27 @@ const editorTheme = EditorView.theme({
     display: 'flex',
     flexDirection: 'column',
     flex: '1 1 0%',
+    cursor: CUTE_ORANGE_IBEAM,
   },
   '.cm-scroller': {
     flex: '1 1 0%',
     overflow: 'auto',
+    cursor: CUTE_ORANGE_IBEAM,
   },
   '.cm-content': {
     padding: '12px 0',
-    caretColor: '#2563eb',
+    caretColor: '#f97316',
+    cursor: CUTE_ORANGE_IBEAM,
   },
-  '.cm-cursor': {
-    borderLeftColor: '#2563eb',
-    borderLeftWidth: '2px',
+  '.cm-line': {
+    cursor: CUTE_ORANGE_IBEAM,
+  },
+  '.cm-cursor, .cm-dropCursor': {
+    borderLeftColor: '#f97316 !important',
+    borderLeftWidth: '2.5px',
   },
   '&.cm-focused .cm-cursor': {
-    borderLeftColor: '#2563eb',
+    borderLeftColor: '#f97316 !important',
   },
   '.cm-gutters': {
     backgroundColor: '#f8fafc',
@@ -51,15 +60,15 @@ const editorTheme = EditorView.theme({
     userSelect: 'none',
   },
   '.cm-activeLineGutter': {
-    backgroundColor: '#eff6ff',
-    color: '#2563eb',
+    backgroundColor: '#fff7ed',
+    color: '#ea580c',
     fontWeight: '600',
   },
   '.cm-activeLine': {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#fffaf5',
   },
   '.cm-selectionBackground, ::selection': {
-    backgroundColor: '#dbeafe !important',
+    backgroundColor: '#fed7aa !important',
   },
   // XML Token Highlighting
   '.cm-tag': { color: '#2563eb', fontWeight: '500' },
@@ -127,6 +136,7 @@ export function CodeEditor({
         ${hasError ? 'ring-1 ring-error-400' : ''}
         ${className}
       `}
+      style={{ cursor: CUTE_ORANGE_IBEAM }}
     >
       <CodeMirror className="w-full h-full flex-1 flex flex-col" {...editorProps} />
     </div>

@@ -7,7 +7,6 @@ import {
   AlertTriangle,
   Sparkles,
   Copy,
-  Upload,
   FileCode,
   Shield,
   Clock,
@@ -32,11 +31,6 @@ import {
   validateAgainstXsd,
   type XmlValidationDiagnostic,
   type XsdValidationResult,
-  SAP_SOAP_VALID,
-  SAP_IDOC_VALID,
-  SAP_ERR_TAG_MISMATCH,
-  SAP_ERR_UNESCAPED_AMP,
-  SAP_ERR_MULTIPLE_ROOTS,
   SAMPLE_SAP_XSD,
 } from '@/utils/xml/xmlValidator';
 
@@ -46,7 +40,7 @@ export function XmlValidatorPage() {
   const { addToast } = useToastContext();
 
   // State
-  const [inputXml, setInputXml] = useState(SAP_SOAP_VALID);
+  const [inputXml, setInputXml] = useState('');
   const [inputXsd, setInputXsd] = useState(SAMPLE_SAP_XSD);
   const [validationMode, setValidationMode] = useState<'syntax' | 'xsd'>('syntax');
   const [activeTab, setActiveTab] = useState<'xml' | 'xsd'>('xml');
@@ -54,7 +48,7 @@ export function XmlValidatorPage() {
 
   // Diagnostics state
   const [diagnostic, setDiagnostic] = useState<XmlValidationDiagnostic>(() =>
-    validateXmlStructure(SAP_SOAP_VALID)
+    validateXmlStructure('')
   );
   const [xsdResult, setXsdResult] = useState<XsdValidationResult | null>(null);
   const [copied, setCopied] = useState(false);
@@ -106,52 +100,6 @@ export function XmlValidatorPage() {
       title: 'Auto-Fix Applied',
       description: fixes.join('. '),
     });
-  };
-
-  // Sample loading
-  const handleLoadSample = (sampleKey: string) => {
-    switch (sampleKey) {
-      case 'soap-valid':
-        setInputXml(SAP_SOAP_VALID);
-        setActiveFileName('SAP_CPI_SOAP_Order.xml');
-        setValidationMode('syntax');
-        addToast({ type: 'info', title: 'Loaded valid SAP CPI SOAP Envelope' });
-        break;
-      case 'idoc-valid':
-        setInputXml(SAP_IDOC_VALID);
-        setActiveFileName('SAP_IDOC_ORDERS05.xml');
-        setValidationMode('syntax');
-        addToast({ type: 'info', title: 'Loaded valid SAP IDoc ORDERS05 document' });
-        break;
-      case 'err-mismatch':
-        setInputXml(SAP_ERR_TAG_MISMATCH);
-        setActiveFileName('Error_Tag_Mismatch.xml');
-        setValidationMode('syntax');
-        addToast({ type: 'warning', title: 'Loaded tag mismatch sample (<Sender> vs </Receiver>)' });
-        break;
-      case 'err-amp':
-        setInputXml(SAP_ERR_UNESCAPED_AMP);
-        setActiveFileName('Error_Unescaped_Ampersand.xml');
-        setValidationMode('syntax');
-        addToast({ type: 'warning', title: 'Loaded unescaped ampersand sample' });
-        break;
-      case 'err-roots':
-        setInputXml(SAP_ERR_MULTIPLE_ROOTS);
-        setActiveFileName('Error_Multiple_Roots.xml');
-        setValidationMode('syntax');
-        addToast({ type: 'warning', title: 'Loaded multiple root elements sample' });
-        break;
-      case 'xsd-sample':
-        setInputXml(SAP_ERR_UNESCAPED_AMP);
-        setInputXsd(SAMPLE_SAP_XSD);
-        setActiveFileName('OrderRequest_with_XSD.xml');
-        setValidationMode('xsd');
-        setActiveTab('xml');
-        addToast({ type: 'info', title: 'Loaded XSD Schema validation scenario' });
-        break;
-      default:
-        break;
-    }
   };
 
   // Copy
@@ -353,23 +301,6 @@ export function XmlValidatorPage() {
                   XSD Schema Validation
                 </button>
               </div>
-
-              {/* Sample Selector Dropdown */}
-              <select
-                onChange={(e) => handleLoadSample(e.target.value)}
-                defaultValue=""
-                className="text-xs bg-white border border-neutral-200 text-neutral-700 rounded-md py-1.5 px-2.5 focus:outline-none focus:ring-1 focus:ring-primary-500 shadow-2xs cursor-pointer"
-              >
-                <option value="" disabled>
-                  Load SAP Test Scenario...
-                </option>
-                <option value="soap-valid">✓ Valid SAP CPI SOAP Envelope</option>
-                <option value="idoc-valid">✓ Valid SAP IDoc ORDERS05</option>
-                <option value="err-mismatch">✗ Error: Tag Mismatch (&lt;Sender&gt; vs &lt;/Receiver&gt;)</option>
-                <option value="err-amp">✗ Error: Unescaped Ampersand (&amp; in Vendor Name)</option>
-                <option value="err-roots">✗ Error: Multiple Sibling Root Elements</option>
-                <option value="xsd-sample">⚙ Scenario: XML with XSD Schema</option>
-              </select>
             </div>
 
             {/* Right: Action Buttons */}

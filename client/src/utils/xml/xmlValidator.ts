@@ -165,6 +165,21 @@ function categorizeError(rawError: string): {
     };
   }
 
+  // Unquoted attributes
+  if (
+    lower.includes('attvalue') ||
+    lower.includes('unquoted attribute') ||
+    lower.includes('expected attribute value') ||
+    lower.includes('attribute without value')
+  ) {
+    return {
+      category: 'syntax-error',
+      cleanMessage: 'Unquoted attribute value detected. In XML, all attribute values must be enclosed in quotes.',
+      suggestion:
+        'In XML (unlike HTML), all attribute values must be enclosed in double or single quotes (e.g. id="101").',
+    };
+  }
+
   // Unescaped Characters: bare & or < inside text
   if (
     lower.includes('xmlparseentityref') ||
@@ -556,6 +571,22 @@ export function scanXmlErrors(xml: string): XmlValidationError[] {
         }
       }
 
+      // Check for unquoted attributes: attr=unquotedVal
+      const unquotedAttrRegex = /(\s+[a-zA-Z_][a-zA-Z0-9_.:-]*)\s*=\s*([^"'\s>/]+)/g;
+      let uMatch: RegExpExecArray | null;
+      while ((uMatch = unquotedAttrRegex.exec(tagContent)) !== null) {
+        const attrOffset = i + 1 + tagName.length + uMatch.index;
+        const attrLoc = offsetToLineCol(xml, attrOffset);
+        errors.push({
+          message: `Unquoted attribute value for '${uMatch[1].trim()}'. Attribute values must be enclosed in quotes (e.g. ${uMatch[1].trim()}="${uMatch[2]}").`,
+          line: attrLoc.line,
+          column: attrLoc.column,
+          snippet: generateSnippet(xml, attrLoc.line, attrLoc.column),
+          category: 'syntax-error',
+          suggestion: `In XML, all attribute values must be enclosed in double quotes (e.g., ${uMatch[1].trim()}="${uMatch[2]}").`,
+        });
+      }
+
       if (!isSelfClosing) {
         stack.push({
           name: tagName,
@@ -879,6 +910,20 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
     const passFixes: string[] = [];
     const prevResult = result;
 
+    // 0. Auto-quote unquoted attribute values: e.g. <student id=101> -> <student id="101">
+    result = result.replace(/<([a-zA-Z_?][a-zA-Z0-9_.:-]*)([^>]*?)>/g, (fullMatch, tagName, attrs) => {
+      if (fullMatch.startsWith('<!--') || fullMatch.startsWith('<![CDATA[')) return fullMatch;
+      const unquotedAttrRegex = /(\s+[a-zA-Z_][a-zA-Z0-9_.:-]*\s*=\s*)([^"'\s>/]+)/g;
+      if (unquotedAttrRegex.test(attrs)) {
+        const fixedAttrs = attrs.replace(unquotedAttrRegex, (_m: string, p1: string, p2: string) => {
+          passFixes.push(`Added quotes to attribute in <${tagName}>: ${p1.trim()}"${p2}"`);
+          return `${p1}"${p2}"`;
+        });
+        return `<${tagName}${fixedAttrs}>`;
+      }
+      return fullMatch;
+    });
+
     // 1. Whitespace / BOM before <?xml
     if (/^\s*<\?xml/i.test(result) && !result.startsWith('<?xml')) {
       result = result.replace(/^\s+<\?xml/i, '<?xml');
@@ -952,7 +997,7 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
       continue;
     }
 
-    // 6b. Fix tag mismatches, unclosed tags, and duplicate attributes line-by-line
+    // 6b. Fix tag mismatches, unclosed tags, duplicate attributes, and stray tags
     const lines = result.split(/\r?\n/);
     let linesModified = false;
 
@@ -1001,23 +1046,34 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
 
       // Unclosed Tag: <tagName> opened but never closed before </closingTag>
       if (err.category === 'unclosed-tag') {
-        const matchBefore = err.message.match(
-          /Expected\s+<\/([a-zA-Z0-9_.:-]+)>\s+before\s+<\/([a-zA-Z0-9_.:-]+)>/i
-        );
-        if (matchBefore && err.line) {
-          const unclosedTag = matchBefore[1];
-          const nextTag = matchBefore[2];
-          const targetNextRegex = new RegExp(`(</\\s*${nextTag}\\s*>)`, 'i');
-          const lineIdx = err.line - 1;
-          if (lineIdx >= 0 && lineIdx < lines.length && targetNextRegex.test(lines[lineIdx])) {
-            lines[lineIdx] = lines[lineIdx].replace(targetNextRegex, `</${unclosedTag}>$1`);
+        const matchTag = err.message.match(/<([a-zA-Z0-9_.:-]+)>/);
+        const matchBefore = err.message.match(/before\s+<\/([a-zA-Z0-9_.:-]+)>/i);
+        const matchPremature = err.message.match(/<([a-zA-Z0-9_.:-]+)>\s+opened\s+on\s+line\s+(\d+)/i);
+        const targetLine = err.line ?? (matchPremature ? parseInt(matchPremature[2], 10) : undefined);
+        const lineIdx = targetLine !== undefined ? targetLine - 1 : -1;
+
+        if (matchTag && lineIdx >= 0 && lineIdx < lines.length) {
+          const unclosedTag = matchTag[1];
+          // Check if this line is an unclosed leaf element: <tag>text without </tag>
+          const leafRegex = new RegExp(`<${unclosedTag}(?:\\s[^>]*)?>\\s*([^<\\s]+[^<]*)$`);
+          if (leafRegex.test(lines[lineIdx]) && !lines[lineIdx].includes(`</${unclosedTag}>`)) {
+            lines[lineIdx] = lines[lineIdx].trimEnd() + `</${unclosedTag}>`;
             linesModified = true;
-            passFixes.push(`Line ${err.line}: Inserted missing closing tag </${unclosedTag}>`);
-          }
-        } else {
-          const matchPremature = err.message.match(/<([a-zA-Z0-9_.:-]+)>\s+opened\s+on\s+line\s+(\d+)/i);
-          if (matchPremature) {
-            const unclosedTag = matchPremature[1];
+            passFixes.push(`Line ${targetLine}: Closed unclosed leaf element <${unclosedTag}> with </${unclosedTag}>`);
+          } else if (matchBefore) {
+            const nextTag = matchBefore[1];
+            const targetNextRegex = new RegExp(`(</\\s*${nextTag}\\s*>)`, 'i');
+            for (let k = lineIdx; k < lines.length; k++) {
+              if (targetNextRegex.test(lines[k])) {
+                const indent = lines[k].match(/^(\s*)/)?.[1] || '';
+                lines[k] = lines[k].replace(targetNextRegex, `${indent}</${unclosedTag}>\n$1`);
+                linesModified = true;
+                passFixes.push(`Line ${k + 1}: Inserted missing closing tag </${unclosedTag}> before </${nextTag}>`);
+                break;
+              }
+            }
+          } else {
+            // Premature end of document or no next tag: append before root close or end
             lines.push(`</${unclosedTag}>`);
             linesModified = true;
             passFixes.push(`Appended missing closing tag </${unclosedTag}>`);
@@ -1044,8 +1100,12 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
         }
       }
 
-      // Stray closing tag with no open tag
-      if (err.category === 'tag-mismatch' && err.message.includes('with no matching open tag') && err.line) {
+      // Stray closing tag with no open tag or unexpected closing tag inside another element
+      if (
+        err.category === 'tag-mismatch' &&
+        (err.message.includes('Unexpected closing tag') || err.message.includes('with no matching open tag')) &&
+        err.line
+      ) {
         const strayMatch = err.message.match(/Unexpected closing tag <\/([a-zA-Z0-9_.:-]+)>/i);
         if (strayMatch) {
           const strayTag = strayMatch[1];
@@ -1053,7 +1113,11 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
           if (lineIdx >= 0 && lineIdx < lines.length) {
             const strayRegex = new RegExp(`</\\s*${strayTag}\\s*>`);
             if (strayRegex.test(lines[lineIdx])) {
-              lines[lineIdx] = lines[lineIdx].replace(strayRegex, '');
+              if (lines[lineIdx].trim() === `</${strayTag}>`) {
+                lines[lineIdx] = '__TO_REMOVE__';
+              } else {
+                lines[lineIdx] = lines[lineIdx].replace(strayRegex, '');
+              }
               linesModified = true;
               passFixes.push(`Line ${err.line}: Removed stray closing tag </${strayTag}>`);
             }
@@ -1063,7 +1127,7 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
     }
 
     if (linesModified) {
-      result = lines.join('\n');
+      result = lines.filter((l) => l !== '__TO_REMOVE__').join('\n');
     }
 
     for (const f of passFixes) {

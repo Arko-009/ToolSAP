@@ -215,6 +215,8 @@ export function XmlValidatorPage() {
     reader.readAsText(file);
   };
 
+  const isInputEmpty = !inputXml.trim();
+
   const isActuallyValid =
     validationMode === 'syntax'
       ? diagnostic.isValid
@@ -465,7 +467,7 @@ export function XmlValidatorPage() {
                   value={inputXml}
                   onChange={(val) => setInputXml(val)}
                   placeholder="Paste or upload XML payload to validate..."
-                  hasError={!isActuallyValid}
+                  hasError={!isInputEmpty && !isActuallyValid}
                   minHeight="460px"
                 />
               )}
@@ -497,9 +499,34 @@ export function XmlValidatorPage() {
         }
         rightPane={
           <div className="flex flex-col h-full gap-4">
-            {/* Status Card */}
-            {isActuallyValid ? (
-              <Card padding="lg" className="border-emerald-200 bg-emerald-50/60 shadow-xs">
+            {isInputEmpty ? (
+              <Card padding="lg" className="border-neutral-200/90 bg-white shadow-2xs">
+                <div className="flex flex-col items-center justify-center py-14 px-4 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-neutral-100 border border-neutral-200/80 flex items-center justify-center text-neutral-400 mb-4 shadow-2xs">
+                    <FileCode className="h-7 w-7 stroke-[1.75]" />
+                  </div>
+
+                  <h3 className="text-2xl sm:text-3xl font-extrabold text-neutral-900 tracking-tight mb-2">
+                    Input is Empty
+                  </h3>
+
+                  <p className="text-sm text-neutral-500 max-w-sm mb-6 leading-relaxed">
+                    There is currently no XML document in the editor to inspect or validate.
+                  </p>
+
+                  <div className="w-full max-w-md flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-neutral-100/90 border border-neutral-200 text-neutral-700 text-sm shadow-2xs">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-neutral-200 text-neutral-800 font-mono">
+                      Alert!
+                    </span>
+                    <span className="font-semibold text-neutral-800">Paste your XML code</span>
+                  </div>
+                </div>
+              </Card>
+            ) : (
+              <>
+                {/* Status Card */}
+                {isActuallyValid ? (
+                  <Card padding="lg" className="border-emerald-200 bg-emerald-50/60 shadow-xs">
                 <div className="flex items-start gap-3.5">
                   <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                     <CheckCircle2 className="h-5 w-5 stroke-[2.5]" />
@@ -687,8 +714,8 @@ export function XmlValidatorPage() {
                 </div>
               )}
             </Card>
-
-
+              </>
+            )}
           </div>
         }
         infoSection={

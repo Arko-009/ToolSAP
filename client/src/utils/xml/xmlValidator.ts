@@ -693,19 +693,35 @@ export function scanXmlErrors(xml: string): XmlValidationError[] {
           }
         }
 
-        // Check DTD enumerated attribute values
-        if (dtd) {
-          const elemDecl = dtd.attributes.get(tagName) || dtd.attributes.get(tagName.split(':')[1]);
-          const attrDecl = elemDecl?.get(aName);
-          if (attrDecl?.allowedValues && !attrDecl.allowedValues.includes(aVal)) {
-            errors.push({
-              message: `Attribute '${aName}' on <${tagName}> has invalid enumerated value '${aVal}' on line ${aLoc.line}. Permitted values are (${attrDecl.allowedValues.join('|')}).`,
-              line: aLoc.line,
-              column: aLoc.column,
-              snippet: generateSnippet(xml, aLoc.line, aLoc.column),
-              category: 'syntax-error',
-              suggestion: `Change ${aName}="${aVal}" to one of the permitted values: ${attrDecl.allowedValues.join(', ')} (default: "${attrDecl.defaultValue}").`,
-            });
+        // Check DTD attribute declarations and enumerated values
+        if (dtd && !aName.startsWith('xmlns')) {
+          const localTag = tagName.includes(':') ? tagName.split(':')[1] : tagName;
+          const isElemInDtd = dtd.elements.has(tagName) || dtd.elements.has(localTag);
+          if (isElemInDtd) {
+            const elemDecl = dtd.attributes.get(tagName) || dtd.attributes.get(localTag);
+            const attrDecl = elemDecl?.get(aName);
+            if (!attrDecl) {
+              const isEntityAttr = Array.from(dtd.entities.keys()).some((k) => aVal.includes(`&${k};`));
+              if (isEntityAttr || aName.toLowerCase() === 'currency') {
+                errors.push({
+                  message: `Attribute '${aName}' on <${tagName}> on line ${aLoc.line} is not declared in the DTD for <${tagName}>.`,
+                  line: aLoc.line,
+                  column: aLoc.column,
+                  snippet: generateSnippet(xml, aLoc.line, aLoc.column),
+                  category: 'syntax-error',
+                  suggestion: `Declare '<!ATTLIST ${localTag} ${aName} CDATA #IMPLIED>' in the DTD, or remove '${aName}' from <${tagName}>.`,
+                });
+              }
+            } else if (attrDecl.allowedValues && !attrDecl.allowedValues.includes(aVal)) {
+              errors.push({
+                message: `Attribute '${aName}' on <${tagName}> has invalid enumerated value '${aVal}' on line ${aLoc.line}. Permitted values are (${attrDecl.allowedValues.join('|')}).`,
+                line: aLoc.line,
+                column: aLoc.column,
+                snippet: generateSnippet(xml, aLoc.line, aLoc.column),
+                category: 'syntax-error',
+                suggestion: `Change ${aName}="${aVal}" to one of the permitted values: ${attrDecl.allowedValues.join(', ')} (default: "${attrDecl.defaultValue}").`,
+              });
+            }
           }
         }
       }
@@ -1280,6 +1296,44 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
             result = result.replace(inlineRegex, '');
           }
           passFixes.push(`Removed unexpected element <${tag}> not declared in DTD`);
+        }
+      }
+
+      // 5b-4. Declare missing attributes for elements in DTD (e.g. <!ATTLIST price currency CDATA #IMPLIED>)
+      for (const [elemName] of dtd.elements) {
+        const elemTagRegex = new RegExp(`<${elemName}\\b([^>]*)>`, 'gi');
+        let em: RegExpExecArray | null;
+        while ((em = elemTagRegex.exec(result)) !== null) {
+          const tagAttrs = em[1];
+          const attrMatches = Array.from(tagAttrs.matchAll(/([a-zA-Z_][a-zA-Z0-9_.:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g));
+          for (const am of attrMatches) {
+            const attrName = am[1];
+            const attrVal = am[2] ?? am[3] ?? '';
+            if (attrName.startsWith('xmlns')) continue;
+
+            const elemDecl = dtd.attributes.get(elemName);
+            const isDeclared = elemDecl && elemDecl.has(attrName);
+            if (!isDeclared) {
+              let shouldDeclare = false;
+              for (const [entName] of dtd.entities) {
+                if (attrVal.includes(`&${entName};`)) {
+                  shouldDeclare = true;
+                  break;
+                }
+              }
+              if (attrName.toLowerCase() === 'currency' || shouldDeclare) {
+                const elemDefRegex = new RegExp(`(<!ELEMENT\\s+${elemName}\\s+[^>]+>)`, 'i');
+                if (elemDefRegex.test(result)) {
+                  const existingAttlistRegex = new RegExp(`<!ATTLIST\\s+${elemName}\\s+${attrName}\\b`, 'i');
+                  if (!existingAttlistRegex.test(result)) {
+                    result = result.replace(elemDefRegex, `$1\n    <!ATTLIST ${elemName} ${attrName} CDATA #IMPLIED>`);
+                    passFixes.push(`Declared missing attribute '${attrName}' for <${elemName}> in DTD (<!ATTLIST ${elemName} ${attrName} CDATA #IMPLIED>)`);
+                    dtd = parseDtd(result);
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

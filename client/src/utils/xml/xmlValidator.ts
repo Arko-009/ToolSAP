@@ -54,6 +54,49 @@ export interface XsdValidationResult {
   warnings: string[];
 }
 
+export function offsetToLineCol(
+  xml: string,
+  offset: number
+): { line: number; column: number } {
+  let line = 1;
+  let lineStart = 0;
+  const target = Math.min(Math.max(0, offset), xml.length);
+  for (let i = 0; i < target; i++) {
+    if (xml[i] === '\n') {
+      line++;
+      lineStart = i + 1;
+    }
+  }
+  return { line, column: Math.max(1, target - lineStart + 1) };
+}
+
+export function generateSnippet(
+  xml: string,
+  line?: number,
+  column?: number
+): string | undefined {
+  if (line === undefined || line <= 0) return undefined;
+  const lines = xml.split(/\r?\n/);
+  const zeroIndexedLine = line - 1;
+  if (zeroIndexedLine < 0 || zeroIndexedLine >= lines.length) return undefined;
+
+  const start = Math.max(0, zeroIndexedLine - 2);
+  const end = Math.min(lines.length - 1, zeroIndexedLine + 2);
+
+  const snippetLines: string[] = [];
+  for (let i = start; i <= end; i++) {
+    const lineNumStr = String(i + 1).padStart(4, ' ');
+    const isTarget = i === zeroIndexedLine;
+    const marker = isTarget ? '▶ ' : '  ';
+    snippetLines.push(`${marker}${lineNumStr} | ${lines[i]}`);
+    if (isTarget && column !== undefined && column > 0) {
+      const pointerPadding = ' '.repeat(Math.max(0, column + 8));
+      snippetLines.push(`${pointerPadding}^ (column ${column})`);
+    }
+  }
+  return snippetLines.join('\n');
+}
+
 /**
  * Extracts accurate line and column numbers and surrounding code snippet
  */
@@ -86,26 +129,7 @@ function extractErrorLocation(
     column = parseInt(lineMatch[2], 10);
   }
 
-  let snippet: string | undefined;
-  if (line !== undefined && line > 0) {
-    const lines = xml.split(/\r?\n/);
-    const zeroIndexedLine = line - 1;
-    const start = Math.max(0, zeroIndexedLine - 2);
-    const end = Math.min(lines.length - 1, zeroIndexedLine + 2);
-
-    const snippetLines: string[] = [];
-    for (let i = start; i <= end; i++) {
-      const lineNumStr = String(i + 1).padStart(4, ' ');
-      const isTarget = i === zeroIndexedLine;
-      const marker = isTarget ? '▶ ' : '  ';
-      snippetLines.push(`${marker}${lineNumStr} | ${lines[i]}`);
-      if (isTarget && column !== undefined && column > 0) {
-        const pointerPadding = ' '.repeat(Math.max(0, column + 8));
-        snippetLines.push(`${pointerPadding}^ (column ${column})`);
-      }
-    }
-    snippet = snippetLines.join('\n');
-  }
+  const snippet = generateSnippet(xml, line, column);
 
   return { line, column, snippet };
 }
@@ -118,7 +142,10 @@ function categorizeError(rawError: string): {
   cleanMessage: string;
   suggestion: string;
 } {
-  const lower = rawError.toLowerCase();
+  const stripped = rawError
+    .replace(/^This page contains the following errors:\s*/i, '')
+    .trim();
+  const lower = stripped.toLowerCase();
 
   // Tag Mismatch: e.g. <Sender> closed with </Receiver>
   if (
@@ -128,7 +155,7 @@ function categorizeError(rawError: string): {
   ) {
     return {
       category: 'tag-mismatch',
-      cleanMessage: rawError
+      cleanMessage: stripped
         .replace(/^error on line \d+ at column \d+:\s*/i, '')
         .replace(/^XML Parsing Error:\s*/i, '')
         .split('\n')[0]
@@ -218,14 +245,372 @@ function categorizeError(rawError: string): {
   // Default Fallback
   return {
     category: 'syntax-error',
-    cleanMessage: rawError
-      .replace(/^error on line \d+ at column \d+:\s*/i, '')
-      .replace(/^XML Parsing Error:\s*/i, '')
-      .split('\n')[0]
-      .trim() || 'Malformed XML document structure.',
+    cleanMessage:
+      stripped
+        .replace(/^error on line \d+ at column \d+:\s*/i, '')
+        .replace(/^XML Parsing Error:\s*/i, '')
+        .split('\n')[0]
+        .trim() || 'Malformed XML document structure.',
     suggestion:
       'Review your XML structure against standard W3C XML 1.0 guidelines. Check for matching tags, valid attribute quotes, and proper nesting.',
   };
+}
+
+interface TagStackItem {
+  name: string;
+  line: number;
+  column: number;
+  offset: number;
+}
+
+/**
+ * Scans an XML string to detect ALL structural syntax errors across the entire document
+ * (unlike browser DOMParser which halts at the very first fatal error).
+ */
+export function scanXmlErrors(xml: string): XmlValidationError[] {
+  const errors: XmlValidationError[] = [];
+  const stack: TagStackItem[] = [];
+  let rootElementCount = 0;
+  let rootClosed = false;
+
+  let i = 0;
+  const len = xml.length;
+
+  while (i < len) {
+    // 1. Comment <!-- ... -->
+    if (xml.startsWith('<!--', i)) {
+      const endComment = xml.indexOf('-->', i + 4);
+      if (endComment === -1) {
+        const loc = offsetToLineCol(xml, i);
+        errors.push({
+          message: `Unclosed comment '<!--' starting on line ${loc.line}`,
+          line: loc.line,
+          column: loc.column,
+          snippet: generateSnippet(xml, loc.line, loc.column),
+          category: 'syntax-error',
+          suggestion: "Close the comment with '-->'.",
+        });
+        break;
+      }
+      i = endComment + 3;
+      continue;
+    }
+
+    // 2. CDATA <![CDATA[ ... ]]>
+    if (xml.startsWith('<![CDATA[', i)) {
+      const endCdata = xml.indexOf(']]>', i + 9);
+      if (endCdata === -1) {
+        const loc = offsetToLineCol(xml, i);
+        errors.push({
+          message: `Unclosed CDATA section '<![CDATA[' starting on line ${loc.line}`,
+          line: loc.line,
+          column: loc.column,
+          snippet: generateSnippet(xml, loc.line, loc.column),
+          category: 'syntax-error',
+          suggestion: "Close the CDATA block with ']]>'.",
+        });
+        break;
+      }
+      i = endCdata + 3;
+      continue;
+    }
+
+    // 3. Processing Instructions / XML Declaration <? ... ?>
+    if (xml.startsWith('<?', i)) {
+      const endPi = xml.indexOf('?>', i + 2);
+      const loc = offsetToLineCol(xml, i);
+      if (endPi === -1) {
+        errors.push({
+          message: `Unclosed XML processing instruction on line ${loc.line}`,
+          line: loc.line,
+          column: loc.column,
+          snippet: generateSnippet(xml, loc.line, loc.column),
+          category: 'declaration-error',
+          suggestion: "Close the declaration with '?>'.",
+        });
+        break;
+      }
+      if (xml.substring(i, i + 5).toLowerCase() === '<?xml') {
+        const preceding = xml.substring(0, i);
+        if (preceding.trim().length > 0) {
+          errors.push({
+            message: 'XML declaration (<?xml ...?>) is misplaced. It must be the very first token in the document.',
+            line: loc.line,
+            column: loc.column,
+            snippet: generateSnippet(xml, loc.line, loc.column),
+            category: 'declaration-error',
+            suggestion: 'Move <?xml ...?> to the beginning of the file without preceding tags or text.',
+          });
+        }
+      }
+      i = endPi + 2;
+      continue;
+    }
+
+    // 4. DOCTYPE <!DOCTYPE ... >
+    if (xml.startsWith('<!DOCTYPE', i) || xml.startsWith('<!doctype', i)) {
+      let j = i + 9;
+      let inSubset = false;
+      while (j < len) {
+        if (xml[j] === '[') inSubset = true;
+        else if (xml[j] === ']') inSubset = false;
+        else if (xml[j] === '>' && !inSubset) {
+          break;
+        }
+        j++;
+      }
+      if (j >= len) {
+        const loc = offsetToLineCol(xml, i);
+        errors.push({
+          message: `Unclosed DOCTYPE declaration starting on line ${loc.line}`,
+          line: loc.line,
+          column: loc.column,
+          snippet: generateSnippet(xml, loc.line, loc.column),
+          category: 'syntax-error',
+          suggestion: "Close the DOCTYPE declaration with '>'.",
+        });
+        break;
+      }
+      i = j + 1;
+      continue;
+    }
+
+    // 5. End Tag </tagname>
+    if (xml.startsWith('</', i)) {
+      const closeBracket = xml.indexOf('>', i + 2);
+      const loc = offsetToLineCol(xml, i);
+      if (closeBracket === -1) {
+        errors.push({
+          message: `Unclosed end tag bracket on line ${loc.line}`,
+          line: loc.line,
+          column: loc.column,
+          snippet: generateSnippet(xml, loc.line, loc.column),
+          category: 'syntax-error',
+          suggestion: "Close the tag with '>'.",
+        });
+        break;
+      }
+
+      const rawTagName = xml.substring(i + 2, closeBracket).trim();
+      const matchClosing = rawTagName.match(/^([a-zA-Z_][a-zA-Z0-9_.:-]*)/);
+      const closingName = matchClosing ? matchClosing[1] : rawTagName;
+      const closeLoc = offsetToLineCol(xml, closeBracket + 1);
+
+      if (stack.length === 0) {
+        errors.push({
+          message: `Unexpected closing tag </${closingName}> with no matching open tag`,
+          line: closeLoc.line,
+          column: closeLoc.column,
+          snippet: generateSnippet(xml, closeLoc.line, closeLoc.column),
+          category: 'tag-mismatch',
+          suggestion: `Remove the redundant </${closingName}> or check preceding opening tags.`,
+        });
+      } else {
+        const top = stack[stack.length - 1];
+        if (top.name === closingName) {
+          // Perfectly matched
+          stack.pop();
+          if (stack.length === 0) {
+            rootClosed = true;
+          }
+        } else {
+          // Tag mismatch!
+          // Check if closingName matches an ancestor deeper down the stack
+          const ancestorIdx = stack.slice(0, -1).map((t) => t.name).lastIndexOf(closingName);
+          if (ancestorIdx !== -1) {
+            // An intermediate tag was never closed!
+            const unclosed = stack[stack.length - 1];
+            errors.push({
+              message: `Unclosed tag <${unclosed.name}> opened on line ${unclosed.line}. Expected </${unclosed.name}> before </${closingName}>`,
+              line: unclosed.line,
+              column: unclosed.column,
+              snippet: generateSnippet(xml, unclosed.line, unclosed.column),
+              category: 'unclosed-tag',
+              suggestion: `Ensure <${unclosed.name}> is properly closed with </${unclosed.name}>.`,
+            });
+            // Pop down to the matched ancestor
+            stack.splice(ancestorIdx);
+            if (stack.length === 0) rootClosed = true;
+          } else {
+            // closingName is not in the stack.
+            // Check if top.name has another matching </top.name> later in the document
+            const hasLaterCloseForTop = xml.indexOf(`</${top.name}>`, closeBracket + 1) !== -1;
+            if (hasLaterCloseForTop) {
+              // top will be closed later, so this is a stray/unexpected closing tag
+              errors.push({
+                message: `Unexpected closing tag </${closingName}> inside <${top.name}> on line ${closeLoc.line}`,
+                line: closeLoc.line,
+                column: closeLoc.column,
+                snippet: generateSnippet(xml, closeLoc.line, closeLoc.column),
+                category: 'tag-mismatch',
+                suggestion: `Remove the stray </${closingName}> or check tag nesting.`,
+              });
+            } else {
+              // Direct mismatch for top!
+              errors.push({
+                message: `Opening and ending tag mismatch: ${top.name} line ${top.line} and ${closingName}`,
+                line: closeLoc.line,
+                column: closeLoc.column,
+                snippet: generateSnippet(xml, closeLoc.line, closeLoc.column),
+                category: 'tag-mismatch',
+                suggestion: `XML element tags are strictly case-sensitive. Check if the closing tag spelling or casing differs from the opening tag (e.g., <${top.name}> vs </${closingName}>).`,
+              });
+              stack.pop();
+              if (stack.length === 0) rootClosed = true;
+            }
+          }
+        }
+      }
+
+      i = closeBracket + 1;
+      continue;
+    }
+
+    // 6. Start Tag <tagname ...>
+    if (xml[i] === '<') {
+      const matchStart = xml.substring(i + 1).match(/^([a-zA-Z_][a-zA-Z0-9_.:-]*)/);
+      if (!matchStart) {
+        const loc = offsetToLineCol(xml, i);
+        errors.push({
+          message: `Unescaped '<' character or invalid element name on line ${loc.line}`,
+          line: loc.line,
+          column: loc.column,
+          snippet: generateSnippet(xml, loc.line, loc.column),
+          category: 'unescaped-character',
+          suggestion: "In XML text content, '<' must be escaped as '&lt;'.",
+        });
+        i++;
+        continue;
+      }
+
+      const tagName = matchStart[1];
+      const startLoc = offsetToLineCol(xml, i + 1);
+
+      // Find closing '>' taking attribute quotes into account
+      let j = i + 1 + tagName.length;
+      let inQuote: string | null = null;
+      while (j < len) {
+        const ch = xml[j];
+        if (inQuote) {
+          if (ch === inQuote) inQuote = null;
+        } else {
+          if (ch === '"' || ch === "'") {
+            inQuote = ch;
+          } else if (ch === '>') {
+            break;
+          }
+        }
+        j++;
+      }
+
+      if (j >= len) {
+        errors.push({
+          message: `Unterminated start tag <${tagName}> on line ${startLoc.line}`,
+          line: startLoc.line,
+          column: startLoc.column,
+          snippet: generateSnippet(xml, startLoc.line, startLoc.column),
+          category: 'unclosed-tag',
+          suggestion: "Close the opening tag with '>'.",
+        });
+        break;
+      }
+
+      const tagContent = xml.substring(i + 1 + tagName.length, j);
+      const isSelfClosing = tagContent.trimEnd().endsWith('/');
+
+      // Multiple Root Elements Check
+      if (stack.length === 0) {
+        if (rootClosed) {
+          errors.push({
+            message: `Extra content at the end of document. Multiple root elements are not allowed in XML (<${tagName}> on line ${startLoc.line})`,
+            line: startLoc.line,
+            column: startLoc.column,
+            snippet: generateSnippet(xml, startLoc.line, startLoc.column),
+            category: 'multiple-roots',
+            suggestion: 'Every valid XML document must have exactly one root element enclosing all content. Wrap sibling elements in a parent wrapper tag.',
+          });
+        } else {
+          rootElementCount++;
+        }
+      }
+
+      // Check Duplicate Attributes on this element
+      const attrRegex = /([a-zA-Z_][a-zA-Z0-9_.:-]*)\s*=\s*(?:"[^"]*"|'[^']*')/g;
+      const seenAttrs = new Set<string>();
+      let attrMatch: RegExpExecArray | null;
+      while ((attrMatch = attrRegex.exec(tagContent)) !== null) {
+        const attrName = attrMatch[1];
+        if (seenAttrs.has(attrName)) {
+          const attrOffset = i + 1 + tagName.length + attrMatch.index;
+          const attrLoc = offsetToLineCol(xml, attrOffset);
+          errors.push({
+            message: `Duplicate attribute '${attrName}' defined on element <${tagName}> on line ${attrLoc.line}`,
+            line: attrLoc.line,
+            column: attrLoc.column,
+            snippet: generateSnippet(xml, attrLoc.line, attrLoc.column),
+            category: 'duplicate-attribute',
+            suggestion: `An XML tag cannot have two attributes with the identical name (e.g. <${tagName} ${attrName}="1" ${attrName}="2">). Remove the duplicate.`,
+          });
+        } else {
+          seenAttrs.add(attrName);
+        }
+      }
+
+      if (!isSelfClosing) {
+        stack.push({
+          name: tagName,
+          line: startLoc.line,
+          column: startLoc.column,
+          offset: i,
+        });
+      }
+
+      i = j + 1;
+      continue;
+    }
+
+    // 7. Check for bare '&' in text
+    if (xml[i] === '&') {
+      const entityMatch = xml.substring(i).match(/^&(?:[a-zA-Z_][a-zA-Z0-9_.-]*|#[0-9]+|#x[0-9a-fA-F]+);/);
+      if (!entityMatch) {
+        const loc = offsetToLineCol(xml, i);
+        errors.push({
+          message: `Unescaped '&' found on line ${loc.line}, column ${loc.column}. In XML, bare ampersands must be written as '&amp;'`,
+          line: loc.line,
+          column: loc.column,
+          snippet: generateSnippet(xml, loc.line, loc.column),
+          category: 'unescaped-character',
+          suggestion: "Special characters in XML text must be escaped: replace '&' with '&amp;', '<' with '&lt;', and '>' with '&gt;'. Bare ampersands (e.g. 'SAP & Cloud') are the #1 cause of CPI pipeline failures.",
+        });
+      }
+    }
+
+    i++;
+  }
+
+  // 8. Remaining unclosed tags in stack
+  while (stack.length > 0) {
+    const unclosed = stack.pop()!;
+    errors.push({
+      message: `Premature end of XML data; unclosed tag <${unclosed.name}> opened on line ${unclosed.line}`,
+      line: unclosed.line,
+      column: unclosed.column,
+      snippet: generateSnippet(xml, unclosed.line, unclosed.column),
+      category: 'unclosed-tag',
+      suggestion: `A tag was opened but never closed before the document ended. Ensure <${unclosed.name}> is properly closed with </${unclosed.name}>.`,
+    });
+  }
+
+  // 9. No root element
+  if (rootElementCount === 0 && errors.length === 0) {
+    errors.push({
+      message: 'No root element found or XML document is empty.',
+      category: 'no-root',
+      suggestion: 'The payload contains no valid XML elements. Ensure at least one root element is defined.',
+    });
+  }
+
+  return errors;
 }
 
 /**
@@ -339,21 +724,65 @@ export function validateXmlStructure(xml: string): XmlValidationDiagnostic {
 
     if (parserError) {
       const rawText = parserError.textContent || 'Unknown XML parsing error';
-      const loc = extractErrorLocation(xml, rawText);
-      const { category, cleanMessage, suggestion } = categorizeError(rawText);
+      const domLoc = extractErrorLocation(xml, rawText);
+      const { category: domCategory, cleanMessage: domCleanMessage, suggestion: domSuggestion } =
+        categorizeError(rawText);
+
+      const domError: XmlValidationError = {
+        message: domCleanMessage,
+        line: domLoc.line,
+        column: domLoc.column,
+        snippet: domLoc.snippet,
+        category: domCategory,
+        suggestion: domSuggestion,
+      };
+
+      // Scan the entire document to detect ALL errors across the payload
+      const scannedErrors = scanXmlErrors(xml);
+      const combinedErrors: XmlValidationError[] = [];
+
+      if (scannedErrors.length > 0) {
+        let domMatched = false;
+        for (const sErr of scannedErrors) {
+          if (domLoc.line !== undefined && sErr.line === domLoc.line) {
+            domMatched = true;
+            combinedErrors.push({
+              ...sErr,
+              column: domLoc.column ?? sErr.column,
+              snippet: domLoc.snippet ?? sErr.snippet,
+            });
+          } else {
+            combinedErrors.push(sErr);
+          }
+        }
+        if (!domMatched && domLoc.line !== undefined) {
+          combinedErrors.unshift(domError);
+        }
+      } else {
+        combinedErrors.push(domError);
+      }
+
+      // Deduplicate by line & column / category
+      const finalErrors: XmlValidationError[] = [];
+      for (const err of combinedErrors) {
+        const isDupe = finalErrors.some(
+          (e) =>
+            e.line === err.line &&
+            (e.column === err.column || e.category === err.category)
+        );
+        if (!isDupe) {
+          finalErrors.push(err);
+        }
+      }
+
+      // Sort in source payload order (line ascending, column ascending)
+      finalErrors.sort(
+        (a, b) => (a.line ?? 0) - (b.line ?? 0) || (a.column ?? 0) - (b.column ?? 0)
+      );
 
       return {
         isValid: false,
-        errors: [
-          {
-            message: cleanMessage,
-            line: loc.line,
-            column: loc.column,
-            snippet: loc.snippet,
-            category,
-            suggestion,
-          },
-        ],
+        errors: finalErrors,
         warnings: [],
         metrics: {
           lineCount: xml.split(/\r?\n/).length,
@@ -429,6 +858,7 @@ export function validateXmlStructure(xml: string): XmlValidationDiagnostic {
  * 1. Escapes bare ampersands '&' -> '&amp;'
  * 2. Trims leading BOM / invisible characters preceding '<?xml'
  * 3. Normalizes smart/curly quotes
+ * 4. Repairs mismatched element closing tags
  */
 export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
   const fixes: string[] = [];
@@ -455,6 +885,25 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
       .replace(/[\u201C\u201D]/g, '"')
       .replace(/[\u2018\u2019]/g, "'");
     fixes.push('Replaced smart/curly quotes with standard XML quotes');
+  }
+
+  // 4. Auto-fix mismatched closing tags
+  const scanned = scanXmlErrors(result);
+  for (const err of scanned) {
+    if (err.category === 'tag-mismatch') {
+      const match = err.message.match(
+        /mismatch:\s*([a-zA-Z0-9_.:-]+)(?:\s+line\s+\d+)?\s+and\s+([a-zA-Z0-9_.:-]+)/i
+      );
+      if (match) {
+        const expectedTag = match[1];
+        const actualTag = match[2];
+        const targetClosing = `</${actualTag}>`;
+        if (result.includes(targetClosing)) {
+          result = result.replace(targetClosing, `</${expectedTag}>`);
+          fixes.push(`Corrected closing tag </${actualTag}> to </${expectedTag}>`);
+        }
+      }
+    }
   }
 
   return { fixedXml: result, fixes };

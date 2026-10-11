@@ -219,10 +219,10 @@ export function XmlValidatorPage() {
       ? diagnostic.isValid
       : diagnostic.isValid && (xsdResult ? xsdResult.isValid : true);
 
-  const primaryError =
+  const activeErrors =
     validationMode === 'xsd' && xsdResult && !xsdResult.isValid && xsdResult.errors.length > 0
-      ? xsdResult.errors[0]
-      : diagnostic.errors[0];
+      ? xsdResult.errors
+      : diagnostic.errors;
 
   const allWarnings = [
     ...diagnostic.warnings,
@@ -542,7 +542,9 @@ export function XmlValidatorPage() {
                   </Badge>
                 ) : (
                   <Badge variant="error" size="sm" dot>
-                    FAIL · Syntax Error
+                    {activeErrors.length > 1
+                      ? `FAIL · ${activeErrors.length} Syntax Mistakes`
+                      : 'FAIL · Syntax Error'}
                   </Badge>
                 )}
               </div>
@@ -609,73 +611,93 @@ export function XmlValidatorPage() {
                       </div>
                     </Card>
                   ) : (
-                    <Card padding="lg" className="border-rose-200 bg-rose-50/70 shadow-xs">
-                      <div className="flex items-start gap-3.5">
-                        <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
-                          <AlertCircle className="h-5 w-5 stroke-[2.5]" />
+                    <div className="space-y-4">
+                      {activeErrors.length > 1 && (
+                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-rose-100/80 border border-rose-200 text-rose-950 text-xs font-semibold shadow-2xs">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                            <span>{activeErrors.length} Syntax Mistakes Detected</span>
+                          </div>
+                          <span className="text-[11px] font-mono text-rose-800 bg-white/90 px-2.5 py-0.5 rounded-md border border-rose-200">
+                            All mistakes listed below
+                          </span>
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <h3 className="text-base font-bold text-rose-950">Syntax Error Detected</h3>
-                            {primaryError?.category && (
-                              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-rose-200/80 text-rose-800 font-semibold">
-                                {primaryError.category.replace('-', ' ')}
-                              </span>
-                            )}
-                          </div>
+                      )}
 
-                          <div className="mt-2 text-xs font-medium text-rose-900 bg-white/80 p-2.5 rounded-lg border border-rose-200/90 font-mono">
-                            {primaryError?.message || 'Malformed XML document.'}
-                          </div>
-
-                          {/* Location marker */}
-                          {(primaryError?.line !== undefined || primaryError?.column !== undefined) && (
-                            <div className="mt-2 flex items-center gap-2 text-xs text-rose-800 font-semibold">
-                              <span className="bg-rose-200/90 text-rose-900 px-2 py-0.5 rounded text-[11px] font-mono">
-                                {primaryError.line !== undefined ? `Line ${primaryError.line}` : ''}
-                                {primaryError.column !== undefined ? `, Col ${primaryError.column}` : ''}
-                              </span>
-                              <span className="text-neutral-500 font-normal">in source payload</span>
+                      {activeErrors.map((err, errIdx) => (
+                        <Card key={errIdx} padding="lg" className="border-rose-200 bg-rose-50/70 shadow-xs">
+                          <div className="flex items-start gap-3.5">
+                            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                              <AlertCircle className="h-5 w-5 stroke-[2.5]" />
                             </div>
-                          )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <h3 className="text-base font-bold text-rose-950">
+                                  {activeErrors.length > 1
+                                    ? `Mistake #${errIdx + 1}: Syntax Error`
+                                    : 'Syntax Error Detected'}
+                                </h3>
+                                {err.category && (
+                                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-rose-200/80 text-rose-800 font-semibold shrink-0">
+                                    {err.category.replace('-', ' ')}
+                                  </span>
+                                )}
+                              </div>
 
-                          {/* Code Snippet Box */}
-                          {primaryError?.snippet && (
-                            <div className="mt-3 bg-neutral-900 text-neutral-100 p-3 rounded-lg text-xs font-mono overflow-x-auto leading-relaxed border border-neutral-800">
-                              <pre className="text-[11px] whitespace-pre">{primaryError.snippet}</pre>
-                            </div>
-                          )}
+                              <div className="mt-2 text-xs font-medium text-rose-900 bg-white/80 p-2.5 rounded-lg border border-rose-200/90 font-mono break-words">
+                                {err.message || 'Malformed XML document.'}
+                              </div>
 
-                          {/* Suggestion & Fix */}
-                          {primaryError?.suggestion && (
-                            <div className="mt-3 p-2.5 rounded-lg bg-amber-50 border border-amber-200/90 text-amber-900 text-xs">
-                              <div className="flex items-start gap-2">
-                                <HelpCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                                <div>
-                                  <span className="font-semibold text-amber-950">How to Fix (SAP CPI): </span>
-                                  <span>{primaryError.suggestion}</span>
+                              {/* Location marker */}
+                              {(err.line !== undefined || err.column !== undefined) && (
+                                <div className="mt-2 flex items-center gap-2 text-xs text-rose-800 font-semibold">
+                                  <span className="bg-rose-200/90 text-rose-900 px-2 py-0.5 rounded text-[11px] font-mono">
+                                    {err.line !== undefined ? `Line ${err.line}` : ''}
+                                    {err.column !== undefined ? `, Col ${err.column}` : ''}
+                                  </span>
+                                  <span className="text-neutral-500 font-normal">in source payload</span>
                                 </div>
+                              )}
+
+                              {/* Code Snippet Box */}
+                              {err.snippet && (
+                                <div className="mt-3 bg-neutral-900 text-neutral-100 p-3 rounded-lg text-xs font-mono overflow-x-auto leading-relaxed border border-neutral-800">
+                                  <pre className="text-[11px] whitespace-pre">{err.snippet}</pre>
+                                </div>
+                              )}
+
+                              {/* Suggestion & Fix */}
+                              {err.suggestion && (
+                                <div className="mt-3 p-2.5 rounded-lg bg-amber-50 border border-amber-200/90 text-amber-900 text-xs">
+                                  <div className="flex items-start gap-2">
+                                    <HelpCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                                    <div>
+                                      <span className="font-semibold text-amber-950">How to Fix (SAP CPI): </span>
+                                      <span>{err.suggestion}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="mt-3.5 flex items-center justify-between">
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  icon={<Sparkles className="h-3.5 w-3.5" />}
+                                  onClick={handleAutoFix}
+                                  className="bg-rose-600 hover:bg-rose-700 text-white"
+                                >
+                                  Auto-Fix with ToolSAP
+                                </Button>
+                                <span className="text-[11px] text-neutral-400 font-mono">
+                                  Error code: {err.category || 'xml-syntax'}
+                                </span>
                               </div>
                             </div>
-                          )}
-
-                          <div className="mt-3.5 flex items-center justify-between">
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              icon={<Sparkles className="h-3.5 w-3.5" />}
-                              onClick={handleAutoFix}
-                              className="bg-rose-600 hover:bg-rose-700 text-white"
-                            >
-                              Auto-Fix with ToolSAP
-                            </Button>
-                            <span className="text-[11px] text-neutral-400 font-mono">
-                              Error code: {primaryError?.category || 'xml-syntax'}
-                            </span>
                           </div>
-                        </div>
-                      </div>
-                    </Card>
+                        </Card>
+                      ))}
+                    </div>
                   )}
 
                   {/* Warnings & Advisories */}
@@ -779,7 +801,7 @@ export function XmlValidatorPage() {
                   </span>
                 ) : (
                   <span className="text-[11px] text-rose-700 font-sans font-medium">
-                    {diagnostic.errors.length} error{diagnostic.errors.length > 1 ? 's' : ''} detected
+                    {activeErrors.length} error{activeErrors.length > 1 ? 's' : ''} detected
                   </span>
                 )}
               </div>

@@ -165,18 +165,19 @@ function categorizeError(rawError: string): {
     };
   }
 
-  // Unquoted attributes
+  // Unquoted attributes or missing attribute value
   if (
     lower.includes('attvalue') ||
     lower.includes('unquoted attribute') ||
     lower.includes('expected attribute value') ||
-    lower.includes('attribute without value')
+    lower.includes('attribute without value') ||
+    lower.includes('specification mandates value for attribute')
   ) {
     return {
       category: 'syntax-error',
-      cleanMessage: 'Unquoted attribute value detected. In XML, all attribute values must be enclosed in quotes.',
+      cleanMessage: 'Unquoted or missing attribute value. In XML, all attributes must have quoted values.',
       suggestion:
-        'In XML (unlike HTML), all attribute values must be enclosed in double or single quotes (e.g. id="101").',
+        'In XML (unlike HTML), all attributes must have quoted values (e.g. state="West Bengal" or disabled="disabled"). Boolean or unquoted attributes are not permitted.',
     };
   }
 
@@ -571,19 +572,21 @@ export function scanXmlErrors(xml: string): XmlValidationError[] {
         }
       }
 
-      // Check for unquoted attributes: attr=unquotedVal
-      const unquotedAttrRegex = /(\s+[a-zA-Z_][a-zA-Z0-9_.:-]*)\s*=\s*([^"'\s>/]+)/g;
+      // Check for unquoted attributes: attr=unquotedVal (including multi-word values like state=West Bengal)
+      const unquotedAttrRegex = /(\s+[a-zA-Z_][a-zA-Z0-9_.:-]*\s*=\s*)([^"'\s][\s\S]*?)(?=\s+[a-zA-Z_][a-zA-Z0-9_.:-]*\s*=|\s*\/$|\s*$)/g;
       let uMatch: RegExpExecArray | null;
       while ((uMatch = unquotedAttrRegex.exec(tagContent)) !== null) {
         const attrOffset = i + 1 + tagName.length + uMatch.index;
         const attrLoc = offsetToLineCol(xml, attrOffset);
+        const attrName = uMatch[1].replace(/=|\s/g, '');
+        const attrVal = uMatch[2].trim();
         errors.push({
-          message: `Unquoted attribute value for '${uMatch[1].trim()}'. Attribute values must be enclosed in quotes (e.g. ${uMatch[1].trim()}="${uMatch[2]}").`,
+          message: `Unquoted attribute value for '${attrName}'. Attribute values must be enclosed in quotes (e.g. ${attrName}="${attrVal}").`,
           line: attrLoc.line,
           column: attrLoc.column,
           snippet: generateSnippet(xml, attrLoc.line, attrLoc.column),
           category: 'syntax-error',
-          suggestion: `In XML, all attribute values must be enclosed in double quotes (e.g., ${uMatch[1].trim()}="${uMatch[2]}").`,
+          suggestion: `In XML, all attribute values must be enclosed in double quotes (e.g., ${attrName}="${attrVal}").`,
         });
       }
 
@@ -910,18 +913,31 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
     const passFixes: string[] = [];
     const prevResult = result;
 
-    // 0. Auto-quote unquoted attribute values: e.g. <student id=101> -> <student id="101">
+    // 0. Auto-quote unquoted attribute values (including multi-word values like state=West Bengal)
     result = result.replace(/<([a-zA-Z_?][a-zA-Z0-9_.:-]*)([^>]*?)>/g, (fullMatch, tagName, attrs) => {
       if (fullMatch.startsWith('<!--') || fullMatch.startsWith('<![CDATA[')) return fullMatch;
-      const unquotedAttrRegex = /(\s+[a-zA-Z_][a-zA-Z0-9_.:-]*\s*=\s*)([^"'\s>/]+)/g;
-      if (unquotedAttrRegex.test(attrs)) {
-        const fixedAttrs = attrs.replace(unquotedAttrRegex, (_m: string, p1: string, p2: string) => {
-          passFixes.push(`Added quotes to attribute in <${tagName}>: ${p1.trim()}"${p2}"`);
-          return `${p1}"${p2}"`;
+      let fixedAttrs = attrs;
+
+      // 0a. Handle unquoted attributes: e.g. state=West Bengal, id=101, id=ST103
+      const unquotedAttrRegex = /(\s+[a-zA-Z_][a-zA-Z0-9_.:-]*\s*=\s*)([^"'\s][\s\S]*?)(?=\s+[a-zA-Z_][a-zA-Z0-9_.:-]*\s*=|\s*\/$|\s*$)/g;
+      if (unquotedAttrRegex.test(fixedAttrs)) {
+        fixedAttrs = fixedAttrs.replace(unquotedAttrRegex, (_m: string, p1: string, p2: string) => {
+          passFixes.push(`Added quotes to attribute in <${tagName}>: ${p1.trim()}"${p2.trim()}"`);
+          return `${p1}"${p2.trim()}"`;
         });
-        return `<${tagName}${fixedAttrs}>`;
       }
-      return fullMatch;
+
+      // 0b. Handle boolean / standalone attributes without value, e.g. <input disabled> -> <input disabled="disabled">
+      const standaloneRegex = /(\s+)([a-zA-Z_][a-zA-Z0-9_.:-]*)(?=\s+(?![=])|\s*\/$|\s*$)/g;
+      if (standaloneRegex.test(fixedAttrs)) {
+        fixedAttrs = fixedAttrs.replace(standaloneRegex, (m: string, space: string, attrName: string) => {
+          if (attrName.startsWith('?') || attrName.endsWith('?')) return m;
+          passFixes.push(`Assigned value to boolean/standalone attribute '${attrName}' in <${tagName}>`);
+          return `${space}${attrName}="${attrName}"`;
+        });
+      }
+
+      return `<${tagName}${fixedAttrs}>`;
     });
 
     // 1. Whitespace / BOM before <?xml

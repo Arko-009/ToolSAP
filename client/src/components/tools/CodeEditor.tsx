@@ -16,8 +16,8 @@ export interface CodeEditorProps {
   hasError?: boolean;
 }
 
-// Cute light-orange custom text cursor SVG data URI
-const CUTE_ORANGE_IBEAM = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='24' viewBox='0 0 16 24' fill='none'%3E%3Cpath d='M4 3h8M8 3v18M4 21h8' stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.85'/%3E%3Cpath d='M4 3h8M8 3v18M4 21h8' stroke='%23f97316' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 8 12, text`;
+// Cute, small and delicate light-orange custom text cursor SVG data URI
+const CUTE_ORANGE_IBEAM = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='16' viewBox='0 0 10 16' fill='none'%3E%3Cpath d='M2.5 1.5h5M5 1.5v13M2.5 14.5h5' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.75'/%3E%3Cpath d='M2.5 1.5h5M5 1.5v13M2.5 14.5h5' stroke='%23f97316' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 5 8, text`;
 
 // Custom crisp theme tailored to ToolSAP's developer palette
 const editorTheme = EditorView.theme({

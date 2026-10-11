@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   Sparkles,
   Copy,
+  Upload,
   FileCode,
   Shield,
   Clock,
@@ -339,7 +340,7 @@ export function XmlValidatorPage() {
         }
         leftPane={
           <div
-            className={`flex flex-col h-full bg-white rounded-xl border transition-colors shadow-2xs overflow-hidden ${
+            className={`w-full h-[580px] lg:h-[620px] flex flex-col bg-white rounded-xl border transition-colors shadow-2xs overflow-hidden ${
               isDragging ? 'border-primary-500 ring-2 ring-primary-100' : 'border-neutral-200'
             }`}
             onDragOver={handleDragOver}
@@ -347,7 +348,7 @@ export function XmlValidatorPage() {
             onDrop={handleDrop}
           >
             {/* Left Header */}
-            <div className="flex items-center justify-between px-4 py-2.5 bg-neutral-50/80 border-b border-neutral-200">
+            <div className="flex items-center justify-between px-4 py-2.5 min-h-[46px] h-[46px] bg-neutral-50/80 border-b border-neutral-200 shrink-0">
               <div className="flex items-center gap-2">
                 {validationMode === 'xsd' ? (
                   <div className="inline-flex rounded-md p-0.5 bg-neutral-200 text-xs">
@@ -385,13 +386,14 @@ export function XmlValidatorPage() {
             </div>
 
             {/* Editor Area */}
-            <div className="flex-1 min-h-[460px] relative flex flex-col">
+            <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
               {validationMode === 'xsd' && activeTab === 'xsd' ? (
                 <CodeEditor
                   value={inputXsd}
                   onChange={(val) => setInputXsd(val)}
                   placeholder="Paste or type XSD Schema (<xs:schema>)..."
-                  minHeight="460px"
+                  height="100%"
+                  minHeight="100%"
                 />
               ) : (
                 <CodeEditor
@@ -399,7 +401,8 @@ export function XmlValidatorPage() {
                   onChange={(val) => setInputXml(val)}
                   placeholder="Paste or upload XML payload to validate..."
                   hasError={!isInputEmpty && !isActuallyValid}
-                  minHeight="460px"
+                  height="100%"
+                  minHeight="100%"
                 />
               )}
 
@@ -414,7 +417,7 @@ export function XmlValidatorPage() {
             </div>
 
             {/* Editor Bottom Evaluation Bar */}
-            <div className="flex items-center justify-between px-4 py-2 bg-neutral-50/80 border-t border-neutral-200 text-xs text-neutral-500 font-mono">
+            <div className="flex items-center justify-between px-4 py-2 min-h-[40px] h-[40px] bg-neutral-50/80 border-t border-neutral-200 text-xs text-neutral-500 font-mono shrink-0">
               <span className="text-[11px] text-neutral-400 font-sans font-medium">
                 {validationMode === 'xsd' && activeTab === 'xsd' ? 'Schema Definition' : 'Input Payload'}
               </span>
@@ -429,10 +432,36 @@ export function XmlValidatorPage() {
           </div>
         }
         rightPane={
-          <div className="flex flex-col h-full gap-4">
-            {isInputEmpty ? (
-              <Card padding="lg" className="border-neutral-200/90 bg-white shadow-2xs">
-                <div className="flex flex-col items-center justify-center py-14 px-4 text-center">
+          <div className="w-full h-[580px] lg:h-[620px] flex flex-col bg-white rounded-xl border border-neutral-200 shadow-2xs overflow-hidden">
+            {/* Right Header */}
+            <div className="flex items-center justify-between px-4 py-2.5 min-h-[46px] h-[46px] bg-neutral-50/80 border-b border-neutral-200 shrink-0">
+              <div className="flex items-center gap-2">
+                <FileCheck2 className="h-4 w-4 text-primary-600" />
+                <span className="text-xs font-semibold text-neutral-800">
+                  Validation Results & Diagnostics
+                </span>
+              </div>
+              <div>
+                {isInputEmpty ? (
+                  <Badge variant="neutral" size="sm">
+                    Awaiting Input
+                  </Badge>
+                ) : isActuallyValid ? (
+                  <Badge variant="success" size="sm" dot>
+                    PASS · Valid XML
+                  </Badge>
+                ) : (
+                  <Badge variant="error" size="sm" dot>
+                    FAIL · Syntax Error
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {/* Right Body */}
+            <div className="flex-1 min-h-0 relative flex flex-col overflow-y-auto bg-neutral-50/30">
+              {isInputEmpty ? (
+                <div className="h-full flex-1 flex flex-col items-center justify-center p-6 text-center">
                   <div className="w-14 h-14 rounded-2xl bg-neutral-100 border border-neutral-200/80 flex items-center justify-center text-neutral-400 mb-4 shadow-2xs">
                     <FileCode className="h-7 w-7 stroke-[1.75]" />
                   </div>
@@ -446,207 +475,225 @@ export function XmlValidatorPage() {
                   </p>
 
                   <div className="w-full max-w-md flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-neutral-100/90 border border-neutral-200 text-neutral-700 text-sm shadow-2xs">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-neutral-200 text-neutral-800 font-mono">
-                      Alert!
-                    </span>
                     <span className="font-semibold text-neutral-800">Paste your XML code</span>
                   </div>
                 </div>
-              </Card>
-            ) : (
-              <>
-                {/* Status Card */}
-                {isActuallyValid ? (
-                  <Card padding="lg" className="border-emerald-200 bg-emerald-50/60 shadow-xs">
-                <div className="flex items-start gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="h-5 w-5 stroke-[2.5]" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-base font-bold text-emerald-950">
-                        {validationMode === 'xsd' ? 'Valid XML & Schema Match' : 'Well-Formed & Valid XML'}
-                      </h3>
-                      <Badge variant="success" size="sm" dot>
-                        PASS
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-xs text-emerald-800 leading-relaxed">
-                      {validationMode === 'xsd'
-                        ? 'The document is structurally well-formed and conforms to the provided XSD schema rules.'
-                        : 'No syntax errors detected. Root element is properly closed, tags are balanced, and special characters are escaped.'}
-                    </p>
+              ) : (
+                <div className="p-4 space-y-4">
+                  {/* Status Card */}
+                  {isActuallyValid ? (
+                    <Card padding="lg" className="border-emerald-200 bg-emerald-50/60 shadow-xs">
+                      <div className="flex items-start gap-3.5">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                          <CheckCircle2 className="h-5 w-5 stroke-[2.5]" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-base font-bold text-emerald-950">
+                              {validationMode === 'xsd' ? 'Valid XML & Schema Match' : 'Well-Formed & Valid XML'}
+                            </h3>
+                            <Badge variant="success" size="sm" dot>
+                              PASS
+                            </Badge>
+                          </div>
+                          <p className="mt-1 text-xs text-emerald-800 leading-relaxed">
+                            {validationMode === 'xsd'
+                              ? 'The document is structurally well-formed and conforms to the provided XSD schema rules.'
+                              : 'No syntax errors detected. Root element is properly closed, tags are balanced, and special characters are escaped.'}
+                          </p>
 
-                    <div className="mt-3.5 pt-3 border-t border-emerald-200/80 flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-[11px] text-emerald-700 font-mono flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        Validated in {diagnostic.metrics.executionTimeMs}ms
-                      </span>
-                      <Link
-                        to="/tools/xml-formatter"
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 hover:text-emerald-950 underline underline-offset-2"
-                      >
-                        <span>Need to format this payload? Open XML Formatter</span>
-                        <ArrowRight className="h-3 w-3" />
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            ) : (
-              <Card padding="lg" className="border-rose-200 bg-rose-50/70 shadow-xs">
-                <div className="flex items-start gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
-                    <AlertCircle className="h-5 w-5 stroke-[2.5]" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-base font-bold text-rose-950">Syntax Error Detected</h3>
-                      {primaryError?.category && (
-                        <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-rose-200/80 text-rose-800 font-semibold">
-                          {primaryError.category.replace('-', ' ')}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="mt-2 text-xs font-medium text-rose-900 bg-white/80 p-2.5 rounded-lg border border-rose-200/90 font-mono">
-                      {primaryError?.message || 'Malformed XML document.'}
-                    </div>
-
-                    {/* Location marker */}
-                    {(primaryError?.line !== undefined || primaryError?.column !== undefined) && (
-                      <div className="mt-2 flex items-center gap-2 text-xs text-rose-800 font-semibold">
-                        <span className="bg-rose-200/90 text-rose-900 px-2 py-0.5 rounded text-[11px] font-mono">
-                          {primaryError.line !== undefined ? `Line ${primaryError.line}` : ''}
-                          {primaryError.column !== undefined ? `, Col ${primaryError.column}` : ''}
-                        </span>
-                        <span className="text-neutral-500 font-normal">in source payload</span>
-                      </div>
-                    )}
-
-                    {/* Code Snippet Box */}
-                    {primaryError?.snippet && (
-                      <div className="mt-3 bg-neutral-900 text-neutral-100 p-3 rounded-lg text-xs font-mono overflow-x-auto leading-relaxed border border-neutral-800">
-                        <pre className="text-[11px] whitespace-pre">{primaryError.snippet}</pre>
-                      </div>
-                    )}
-
-                    {/* Suggestion & Fix */}
-                    {primaryError?.suggestion && (
-                      <div className="mt-3 p-2.5 rounded-lg bg-amber-50 border border-amber-200/90 text-amber-900 text-xs">
-                        <div className="flex items-start gap-2">
-                          <HelpCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                          <div>
-                            <span className="font-semibold text-amber-950">How to Fix (SAP CPI): </span>
-                            <span>{primaryError.suggestion}</span>
+                          <div className="mt-3.5 pt-3 border-t border-emerald-200/80 flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-[11px] text-emerald-700 font-mono flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              Validated in {diagnostic.metrics.executionTimeMs}ms
+                            </span>
+                            <Link
+                              to="/tools/xml-formatter"
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 hover:text-emerald-950 underline underline-offset-2"
+                            >
+                              <span>Need to format this payload? Open XML Formatter</span>
+                              <ArrowRight className="h-3 w-3" />
+                            </Link>
                           </div>
                         </div>
                       </div>
-                    )}
+                    </Card>
+                  ) : (
+                    <Card padding="lg" className="border-rose-200 bg-rose-50/70 shadow-xs">
+                      <div className="flex items-start gap-3.5">
+                        <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                          <AlertCircle className="h-5 w-5 stroke-[2.5]" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="text-base font-bold text-rose-950">Syntax Error Detected</h3>
+                            {primaryError?.category && (
+                              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-rose-200/80 text-rose-800 font-semibold">
+                                {primaryError.category.replace('-', ' ')}
+                              </span>
+                            )}
+                          </div>
 
-                    <div className="mt-3.5 flex items-center justify-between">
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        icon={<Sparkles className="h-3.5 w-3.5" />}
-                        onClick={handleAutoFix}
-                        className="bg-rose-600 hover:bg-rose-700 text-white"
-                      >
-                        Auto-Fix with ToolSAP
-                      </Button>
-                      <span className="text-[11px] text-neutral-400 font-mono">
-                        Error code: {primaryError?.category || 'xml-syntax'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            )}
+                          <div className="mt-2 text-xs font-medium text-rose-900 bg-white/80 p-2.5 rounded-lg border border-rose-200/90 font-mono">
+                            {primaryError?.message || 'Malformed XML document.'}
+                          </div>
 
-            {/* Warnings & Advisories */}
-            {allWarnings.length > 0 && (
-              <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3.5 text-xs text-amber-900">
-                <div className="flex items-center gap-2 font-semibold text-amber-950 mb-1.5">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <span>Integration Advisories ({allWarnings.length})</span>
-                </div>
-                <ul className="list-disc list-inside space-y-1 text-amber-800 text-[11px]">
-                  {allWarnings.map((warn, i) => (
-                    <li key={i}>{warn}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+                          {/* Location marker */}
+                          {(primaryError?.line !== undefined || primaryError?.column !== undefined) && (
+                            <div className="mt-2 flex items-center gap-2 text-xs text-rose-800 font-semibold">
+                              <span className="bg-rose-200/90 text-rose-900 px-2 py-0.5 rounded text-[11px] font-mono">
+                                {primaryError.line !== undefined ? `Line ${primaryError.line}` : ''}
+                                {primaryError.column !== undefined ? `, Col ${primaryError.column}` : ''}
+                              </span>
+                              <span className="text-neutral-500 font-normal">in source payload</span>
+                            </div>
+                          )}
 
-            {/* Structure Metrics Dashboard */}
-            <Card padding="md" className="border-neutral-200 shadow-2xs">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-3 flex items-center gap-1.5">
-                <Layers className="h-3.5 w-3.5 text-primary-600" />
-                <span>Payload Structure & Metrics</span>
-              </h4>
+                          {/* Code Snippet Box */}
+                          {primaryError?.snippet && (
+                            <div className="mt-3 bg-neutral-900 text-neutral-100 p-3 rounded-lg text-xs font-mono overflow-x-auto leading-relaxed border border-neutral-800">
+                              <pre className="text-[11px] whitespace-pre">{primaryError.snippet}</pre>
+                            </div>
+                          )}
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100">
-                  <div className="text-[10px] text-neutral-500 uppercase font-semibold">Total Tags</div>
-                  <div className="text-base font-bold text-neutral-900 mt-0.5">
-                    {diagnostic.metrics.elementCount.toLocaleString()}
-                  </div>
-                </div>
-                <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100">
-                  <div className="text-[10px] text-neutral-500 uppercase font-semibold">Attributes</div>
-                  <div className="text-base font-bold text-neutral-900 mt-0.5">
-                    {diagnostic.metrics.attributeCount.toLocaleString()}
-                  </div>
-                </div>
-                <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100">
-                  <div className="text-[10px] text-neutral-500 uppercase font-semibold">Max Depth</div>
-                  <div className="text-base font-bold text-neutral-900 mt-0.5">
-                    {diagnostic.metrics.maxDepth} levels
-                  </div>
-                </div>
-                <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100">
-                  <div className="text-[10px] text-neutral-500 uppercase font-semibold">Namespaces</div>
-                  <div className="text-base font-bold text-neutral-900 mt-0.5">
-                    {diagnostic.metrics.namespaces.length}
-                  </div>
-                </div>
-              </div>
+                          {/* Suggestion & Fix */}
+                          {primaryError?.suggestion && (
+                            <div className="mt-3 p-2.5 rounded-lg bg-amber-50 border border-amber-200/90 text-amber-900 text-xs">
+                              <div className="flex items-start gap-2">
+                                <HelpCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                                <div>
+                                  <span className="font-semibold text-amber-950">How to Fix (SAP CPI): </span>
+                                  <span>{primaryError.suggestion}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
-              {/* Root Element and Namespaces Detail */}
-              {diagnostic.metrics.rootElementName && (
-                <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-neutral-500 font-medium">Root Element:</span>
-                    <span className="font-mono font-semibold text-primary-700 bg-primary-50 px-2 py-0.5 rounded">
-                      &lt;{diagnostic.metrics.rootElementName}&gt;
-                    </span>
-                  </div>
-
-                  {diagnostic.metrics.namespaces.length > 0 && (
-                    <div className="mt-1">
-                      <div className="text-[11px] text-neutral-500 font-medium mb-1.5">Declared Namespaces:</div>
-                      <div className="space-y-1">
-                        {diagnostic.metrics.namespaces.map((ns, idx) => (
-                          <div
-                            key={idx}
-                            className="text-[11px] font-mono bg-neutral-50 border border-neutral-200/60 rounded px-2 py-1 flex items-center justify-between gap-2 overflow-hidden"
-                          >
-                            <span className="font-semibold text-neutral-700 shrink-0">
-                              xmlns{ns.prefix !== '(default)' ? `:${ns.prefix}` : ''}
-                            </span>
-                            <span className="text-neutral-500 truncate text-[10px]" title={ns.uri}>
-                              {ns.uri}
+                          <div className="mt-3.5 flex items-center justify-between">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              icon={<Sparkles className="h-3.5 w-3.5" />}
+                              onClick={handleAutoFix}
+                              className="bg-rose-600 hover:bg-rose-700 text-white"
+                            >
+                              Auto-Fix with ToolSAP
+                            </Button>
+                            <span className="text-[11px] text-neutral-400 font-mono">
+                              Error code: {primaryError?.category || 'xml-syntax'}
                             </span>
                           </div>
-                        ))}
+                        </div>
                       </div>
+                    </Card>
+                  )}
+
+                  {/* Warnings & Advisories */}
+                  {allWarnings.length > 0 && (
+                    <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3.5 text-xs text-amber-900">
+                      <div className="flex items-center gap-2 font-semibold text-amber-950 mb-1.5">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        <span>Integration Advisories ({allWarnings.length})</span>
+                      </div>
+                      <ul className="list-disc list-inside space-y-1 text-amber-800 text-[11px]">
+                        {allWarnings.map((warn, i) => (
+                          <li key={i}>{warn}</li>
+                        ))}
+                      </ul>
                     </div>
                   )}
+
+                  {/* Structure Metrics Dashboard */}
+                  <Card padding="md" className="border-neutral-200 shadow-2xs">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-3 flex items-center gap-1.5">
+                      <Layers className="h-3.5 w-3.5 text-primary-600" />
+                      <span>Payload Structure & Metrics</span>
+                    </h4>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100">
+                        <div className="text-[10px] text-neutral-500 uppercase font-semibold">Total Tags</div>
+                        <div className="text-base font-bold text-neutral-900 mt-0.5">
+                          {diagnostic.metrics.elementCount.toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100">
+                        <div className="text-[10px] text-neutral-500 uppercase font-semibold">Attributes</div>
+                        <div className="text-base font-bold text-neutral-900 mt-0.5">
+                          {diagnostic.metrics.attributeCount.toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100">
+                        <div className="text-[10px] text-neutral-500 uppercase font-semibold">Max Depth</div>
+                        <div className="text-base font-bold text-neutral-900 mt-0.5">
+                          {diagnostic.metrics.maxDepth} levels
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100">
+                        <div className="text-[10px] text-neutral-500 uppercase font-semibold">Namespaces</div>
+                        <div className="text-base font-bold text-neutral-900 mt-0.5">
+                          {diagnostic.metrics.namespaces.length}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Root Element and Namespaces Detail */}
+                    {diagnostic.metrics.rootElementName && (
+                      <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col gap-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-neutral-500 font-medium">Root Element:</span>
+                          <span className="font-mono font-semibold text-primary-700 bg-primary-50 px-2 py-0.5 rounded">
+                            &lt;{diagnostic.metrics.rootElementName}&gt;
+                          </span>
+                        </div>
+
+                        {diagnostic.metrics.namespaces.length > 0 && (
+                          <div className="mt-1">
+                            <div className="text-[11px] text-neutral-500 font-medium mb-1.5">Declared Namespaces:</div>
+                            <div className="space-y-1">
+                              {diagnostic.metrics.namespaces.map((ns, idx) => (
+                                <div
+                                  key={idx}
+                                  className="text-[11px] font-mono bg-neutral-50 border border-neutral-200/60 rounded px-2 py-1 flex items-center justify-between gap-2 overflow-hidden"
+                                >
+                                  <span className="font-semibold text-neutral-700 shrink-0">
+                                    xmlns{ns.prefix !== '(default)' ? `:${ns.prefix}` : ''}
+                                  </span>
+                                  <span className="text-neutral-500 truncate text-[10px]" title={ns.uri}>
+                                    {ns.uri}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Card>
                 </div>
               )}
-            </Card>
-              </>
-            )}
+            </div>
+
+            {/* Right Bottom Status Bar */}
+            <div className="flex items-center justify-between px-4 py-2 min-h-[40px] h-[40px] bg-neutral-50/80 border-t border-neutral-200 text-xs text-neutral-500 font-mono shrink-0">
+              <span className="text-[11px] text-neutral-400 font-sans font-medium">
+                Diagnostic Engine
+              </span>
+              <div className="flex items-center gap-2">
+                {isInputEmpty ? (
+                  <span className="text-[11px] text-neutral-400 font-sans">Ready to validate</span>
+                ) : isActuallyValid ? (
+                  <span className="text-[11px] text-emerald-700 font-sans font-medium flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Validated in {diagnostic.metrics.executionTimeMs}ms
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-rose-700 font-sans font-medium">
+                    {diagnostic.errors.length} error{diagnostic.errors.length > 1 ? 's' : ''} detected
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         }
         infoSection={

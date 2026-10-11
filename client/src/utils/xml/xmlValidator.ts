@@ -275,7 +275,8 @@ function categorizeError(rawError: string): {
 export interface DtdInfo {
   rootName: string;
   elements: Map<string, { rawModel: string; allowedChildren: string[]; isPcData: boolean }>;
-  attributes: Map<string, Map<string, { type: string; defaultDecl: string }>>;
+  attributes: Map<string, Map<string, { type: string; defaultDecl: string; allowedValues?: string[]; defaultValue?: string }>>;
+  entities: Map<string, string>;
 }
 
 /**
@@ -288,7 +289,8 @@ export function parseDtd(xml: string): DtdInfo | null {
   const rootName = doctypeMatch[1];
   const subset = doctypeMatch[2] || '';
   const elements = new Map<string, { rawModel: string; allowedChildren: string[]; isPcData: boolean }>();
-  const attributes = new Map<string, Map<string, { type: string; defaultDecl: string }>>();
+  const attributes = new Map<string, Map<string, { type: string; defaultDecl: string; allowedValues?: string[]; defaultValue?: string }>>();
+  const entities = new Map<string, string>();
 
   const elemRegex = /<!ELEMENT\s+([a-zA-Z0-9_.:-]+)\s+([^>]+)>/gi;
   let em: RegExpExecArray | null;
@@ -306,13 +308,33 @@ export function parseDtd(xml: string): DtdInfo | null {
   while ((am = attrRegex.exec(subset)) !== null) {
     const elemName = am[1];
     const attrName = am[2];
-    const type = am[3];
+    const type = am[3].trim();
     const defaultDecl = am[4].trim();
+
+    let allowedValues: string[] | undefined;
+    if (type.startsWith('(') && type.endsWith(')')) {
+      allowedValues = type.slice(1, -1).split('|').map((v) => v.trim());
+    }
+
+    let defaultValue: string | undefined;
+    const defMatch = defaultDecl.match(/["']([^"']*)["']/);
+    if (defMatch) {
+      defaultValue = defMatch[1];
+    } else if (allowedValues && allowedValues.length > 0) {
+      defaultValue = allowedValues[0];
+    }
+
     if (!attributes.has(elemName)) attributes.set(elemName, new Map());
-    attributes.get(elemName)!.set(attrName, { type, defaultDecl });
+    attributes.get(elemName)!.set(attrName, { type, defaultDecl, allowedValues, defaultValue });
   }
 
-  return { rootName, elements, attributes };
+  const entRegex = /<!ENTITY\s+([a-zA-Z0-9_.:-]+)\s+["']([^"']*)["']>/gi;
+  let entM: RegExpExecArray | null;
+  while ((entM = entRegex.exec(subset)) !== null) {
+    entities.set(entM[1], entM[2]);
+  }
+
+  return { rootName, elements, attributes, entities };
 }
 
 interface TagStackItem {
@@ -635,25 +657,55 @@ export function scanXmlErrors(xml: string): XmlValidationError[] {
         });
       }
 
-      // Check for XML ID uniqueness across document
-      const idAttrRegex = /\bid\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
-      let idMatch: RegExpExecArray | null;
-      while ((idMatch = idAttrRegex.exec(tagContent)) !== null) {
-        const idVal = idMatch[1] ?? idMatch[2];
-        if (idVal) {
-          if (seenIds.has(idVal)) {
-            const attrOffset = i + 1 + tagName.length + idMatch.index;
-            const attrLoc = offsetToLineCol(xml, attrOffset);
+      // Check for XML ID uniqueness across document (for 'id' and all DTD-declared ID attributes like 'sku')
+      const idAttrNames = new Set<string>(['id']);
+      if (dtd) {
+        for (const [_, attrMap] of dtd.attributes) {
+          for (const [aName, decl] of attrMap) {
+            if (decl.type.toUpperCase() === 'ID') {
+              idAttrNames.add(aName.toLowerCase());
+            }
+          }
+        }
+      }
+
+      const anyAttrRegex = /([a-zA-Z_][a-zA-Z0-9_.:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+      let checkMatch: RegExpExecArray | null;
+      while ((checkMatch = anyAttrRegex.exec(tagContent)) !== null) {
+        const aName = checkMatch[1];
+        const aVal = checkMatch[2] ?? checkMatch[3] ?? '';
+        const aOffset = i + 1 + tagName.length + checkMatch.index;
+        const aLoc = offsetToLineCol(xml, aOffset);
+
+        // Check ID uniqueness
+        if (idAttrNames.has(aName.toLowerCase()) && aVal) {
+          if (seenIds.has(aVal)) {
             errors.push({
-              message: `Duplicate XML ID '${idVal}' found on line ${attrLoc.line}. An XML ID attribute must be unique throughout the document.`,
-              line: attrLoc.line,
-              column: attrLoc.column,
-              snippet: generateSnippet(xml, attrLoc.line, attrLoc.column),
+              message: `Duplicate XML ID '${aVal}' found on line ${aLoc.line}. An XML ID attribute must be unique throughout the document.`,
+              line: aLoc.line,
+              column: aLoc.column,
+              snippet: generateSnippet(xml, aLoc.line, aLoc.column),
               category: 'syntax-error',
-              suggestion: `Two elements share the same ID '${idVal}'. Change '${idVal}' to a unique identifier.`,
+              suggestion: `Two elements share the same ID '${aVal}'. Change '${aVal}' to a unique identifier.`,
             });
           } else {
-            seenIds.add(idVal);
+            seenIds.add(aVal);
+          }
+        }
+
+        // Check DTD enumerated attribute values
+        if (dtd) {
+          const elemDecl = dtd.attributes.get(tagName) || dtd.attributes.get(tagName.split(':')[1]);
+          const attrDecl = elemDecl?.get(aName);
+          if (attrDecl?.allowedValues && !attrDecl.allowedValues.includes(aVal)) {
+            errors.push({
+              message: `Attribute '${aName}' on <${tagName}> has invalid enumerated value '${aVal}' on line ${aLoc.line}. Permitted values are (${attrDecl.allowedValues.join('|')}).`,
+              line: aLoc.line,
+              column: aLoc.column,
+              snippet: generateSnippet(xml, aLoc.line, aLoc.column),
+              category: 'syntax-error',
+              suggestion: `Change ${aName}="${aVal}" to one of the permitted values: ${attrDecl.allowedValues.join(', ')} (default: "${attrDecl.defaultValue}").`,
+            });
           }
         }
       }
@@ -683,7 +735,7 @@ export function scanXmlErrors(xml: string): XmlValidationError[] {
             column: startLoc.column,
             snippet: generateSnippet(xml, startLoc.line, startLoc.column),
             category: 'syntax-error',
-            suggestion: `Remove '<${tagName}>' from the document or declare <!ELEMENT ${tagName} ...> in the DTD.`,
+            suggestion: `Declare <!ELEMENT ${tagName} ...> in the DTD or update <${parentName}> content model to permit it.`,
           });
         }
       }
@@ -1078,8 +1130,43 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
       }
     }
 
-    // 2. Escape bare ampersands outside of entities and CDATA
-    const bareAmpRegex = /&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g;
+    // 1c. Relocate <?xml-stylesheet ...?> processing instruction if placed inside document body
+    const stylesheetRegex = /<\?xml-stylesheet\b[^>]*\?>\s*/gi;
+    const firstRootTag = result.match(/<[a-zA-Z_][a-zA-Z0-9_.:-]*[^>]*>/);
+    if (firstRootTag && firstRootTag.index !== undefined) {
+      let sm: RegExpExecArray | null;
+      let stylesheetFoundInBody = false;
+      const stylesheetsToMove: string[] = [];
+      while ((sm = stylesheetRegex.exec(result)) !== null) {
+        if (sm.index > firstRootTag.index) {
+          stylesheetFoundInBody = true;
+          stylesheetsToMove.push(sm[0].trim());
+        }
+      }
+      if (stylesheetFoundInBody) {
+        result = result.replace(stylesheetRegex, (match, offset) => {
+          if (offset > firstRootTag.index!) {
+            return '';
+          }
+          return match;
+        });
+        const xmlDeclEnd = result.indexOf('?>');
+        if (xmlDeclEnd !== -1) {
+          result =
+            result.substring(0, xmlDeclEnd + 2) +
+            '\n' +
+            stylesheetsToMove.join('\n') +
+            '\n' +
+            result.substring(xmlDeclEnd + 2).trimStart();
+        } else {
+          result = stylesheetsToMove.join('\n') + '\n' + result;
+        }
+        passFixes.push('Moved <?xml-stylesheet ...?> processing instruction to document prolog');
+      }
+    }
+
+    // 2. Escape bare ampersands outside of entities and CDATA (preserving valid entity references like &currency; and &offer;)
+    const bareAmpRegex = /&(?!(?:[a-zA-Z_][a-zA-Z0-9_.:-]*|#\d+|#x[0-9a-fA-F]+);)/g;
     const ampMatches = (result.match(bareAmpRegex) || []).length;
     if (ampMatches > 0) {
       result = result.replace(bareAmpRegex, '&amp;');
@@ -1112,8 +1199,8 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
       passFixes.push("Closed unterminated CDATA with ']]>'");
     }
 
-    // 5b. DTD Namespace Prefix Alignment & Unexpected Element Fix
-    const dtd = parseDtd(result);
+    // 5b. DTD Namespace Prefix Alignment, Enumerated Attributes & Smart Element Conformity
+    let dtd = parseDtd(result);
     if (dtd) {
       // 5b-1. Remove namespace prefixes from elements when DTD declared them without prefix
       for (const [declaredElem] of dtd.elements) {
@@ -1126,7 +1213,25 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
         }
       }
 
-      // 5b-2. Remove unexpected elements not declared in DTD
+      // 5b-2. Fix invalid enumerated attribute values (e.g. status="processing" -> status="pending")
+      for (const [elemName, attrMap] of dtd.attributes) {
+        for (const [attrName, decl] of attrMap) {
+          if (decl.allowedValues && decl.defaultValue) {
+            const enumAttrRegex = new RegExp(`(<${elemName}\\b[^>]*\\s+${attrName}\\s*=\\s*["'])([^"']+)(["'])`, 'gi');
+            if (enumAttrRegex.test(result)) {
+              result = result.replace(enumAttrRegex, (full, p1, val, p3) => {
+                if (!decl.allowedValues!.includes(val)) {
+                  passFixes.push(`Corrected invalid enumerated value '${val}' for attribute '${attrName}' to '${decl.defaultValue}'`);
+                  return `${p1}${decl.defaultValue}${p3}`;
+                }
+                return full;
+              });
+            }
+          }
+        }
+      }
+
+      // 5b-3. Handle unexpected / undeclared elements: preserve intended data (with DTD extension) or remove unexpected elements
       const allDeclared = new Set(dtd.elements.keys());
       allDeclared.add(dtd.rootName);
 
@@ -1140,24 +1245,70 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
       }
 
       for (const tag of undeclaredTags) {
-        const blockRegex = new RegExp(`^[ \\t]*<${tag}(\\s[^>]*)?>[\\s\\S]*?<\\/${tag}>[ \\t]*\\r?\\n?`, 'gmi');
-        if (blockRegex.test(result)) {
-          result = result.replace(blockRegex, '');
+        // Extract content of <tag>...</tag>
+        const contentRegex = new RegExp(`<${tag}(\\s[^>]*)?>([\\s\\S]*?)<\\/${tag}>`, 'i');
+        const cMatch = result.match(contentRegex);
+        const tagContent = cMatch ? cMatch[2] : '';
+
+        // Check if content references a declared DTD entity (like &offer;)
+        let referencesDtdEntity = false;
+        for (const [entName] of dtd.entities) {
+          if (tagContent.includes(`&${entName};`)) {
+            referencesDtdEntity = true;
+            break;
+          }
+        }
+
+        if (referencesDtdEntity) {
+          // Preserve intended data element by extending DTD root content model and declaring element
+          const rootDeclRegex = new RegExp(`(<!ELEMENT\\s+${dtd.rootName}\\s*\\([^)]+)\\)>`, 'i');
+          if (rootDeclRegex.test(result)) {
+            result = result.replace(rootDeclRegex, `$1, ${tag}?)>\n    <!ELEMENT ${tag} (#PCDATA)>`);
+            passFixes.push(`Preserved <${tag}> data element and extended DTD content model for <${dtd.rootName}>`);
+            dtd = parseDtd(result); // refresh DTD with the newly declared element
+          }
+        } else {
+          // Element has no DTD entity binding or intended data declaration; remove it
+          let removed = false;
+          const blockLineRegex = new RegExp(`^[ \\t]*<${tag}(\\s[^>]*)?>[\\s\\S]*?<\\/${tag}>[ \\t]*\\r?\\n?`, 'gmi');
+          if (blockLineRegex.test(result)) {
+            result = result.replace(blockLineRegex, '');
+            removed = true;
+          }
+          if (!removed) {
+            const inlineRegex = new RegExp(`<${tag}(\\s[^>]*)?>[\\s\\S]*?<\\/${tag}>\\s*`, 'gi');
+            result = result.replace(inlineRegex, '');
+          }
           passFixes.push(`Removed unexpected element <${tag}> not declared in DTD`);
         }
       }
     }
 
-    // 5c. Deduplicate XML IDs across document
-    const idRegex = /(\bid\s*=\s*["'])([^"']+)(["'])/gi;
+    // 5c. Deduplicate XML IDs across document (for 'id' and all DTD-declared ID attributes like 'sku')
+    const idAttrNames = new Set<string>(['id']);
+    if (dtd) {
+      for (const [_, attrMap] of dtd.attributes) {
+        for (const [aName, decl] of attrMap) {
+          if (decl.type.toUpperCase() === 'ID') {
+            idAttrNames.add(aName.toLowerCase());
+          }
+        }
+      }
+    }
+
+    const idAttrPattern = Array.from(idAttrNames)
+      .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('|');
+    const universalIdRegex = new RegExp(`(\\b(?:${idAttrPattern})\\s*=\\s*["'])([^"']+)(["'])`, 'gi');
+
     const allIds: string[] = [];
     let im: RegExpExecArray | null;
-    while ((im = idRegex.exec(result)) !== null) {
+    while ((im = universalIdRegex.exec(result)) !== null) {
       allIds.push(im[2]);
     }
 
     const seenIdsForFix = new Set<string>();
-    result = result.replace(idRegex, (full, p1, val, p3) => {
+    result = result.replace(universalIdRegex, (full, p1, val, p3) => {
       if (seenIdsForFix.has(val)) {
         let newId = val;
         const numMatch = val.match(/\d+$/);
@@ -1175,7 +1326,7 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
           } while (allIds.includes(newId) || seenIdsForFix.has(newId));
         }
         seenIdsForFix.add(newId);
-        passFixes.push(`Changed duplicate ID '${val}' to unique ID '${newId}'`);
+        passFixes.push(`Changed duplicate ID '${val}' to unique identifier '${newId}'`);
         return `${p1}${newId}${p3}`;
       } else {
         seenIdsForFix.add(val);

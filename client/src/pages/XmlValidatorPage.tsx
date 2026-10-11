@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   FileCheck2,
@@ -18,6 +18,7 @@ import {
   Check,
   Zap,
   HelpCircle,
+  Trash2,
 } from 'lucide-react';
 import { SEOHead } from '@/components/common/SEOHead';
 import { Button } from '@/components/ui/Button';
@@ -103,11 +104,58 @@ export function XmlValidatorPage() {
     });
   };
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // File Upload
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      addToast({
+        type: 'error',
+        title: 'File too large',
+        description: 'Please upload an XML file under 5 MB.',
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      setInputXml(text);
+      setActiveFileName(file.name);
+      addToast({
+        type: 'success',
+        title: 'File uploaded',
+        description: `${file.name} (${(file.size / 1024).toFixed(1)} KB)`,
+      });
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  // Clear
+  const handleClear = () => {
+    if (!inputXml && !activeFileName) return;
+    setInputXml('');
+    setActiveFileName(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    addToast({
+      type: 'info',
+      title: 'Editor Cleared',
+      description: 'XML input payload has been reset.',
+    });
+  };
+
   // Copy
   const handleCopy = async () => {
-    if (!inputXml) return;
+    const textToCopy = validationMode === 'xsd' && activeTab === 'xsd' ? inputXsd : inputXml;
+    if (!textToCopy) return;
     try {
-      await navigator.clipboard.writeText(inputXml);
+      await navigator.clipboard.writeText(textToCopy);
       setCopied(true);
       addToast({
         type: 'success',
@@ -265,6 +313,15 @@ export function XmlValidatorPage() {
         </div>
       )}
 
+      {/* Hidden file input for file picker */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xml,.xsd,.wsdl,.soap,text/xml,application/xml"
+        onChange={handleFileInputChange}
+        className="hidden"
+      />
+
       <ToolWorkspaceLayout
         toolName="XML Validator"
         toolDescription="Validate XML well-formedness, pinpoint syntax errors with line/column markers, test XSD schemas, and diagnose SAP Integration Suite payloads with 100% in-browser privacy."
@@ -324,17 +381,6 @@ export function XmlValidatorPage() {
               >
                 Auto-Fix Common Errors
               </Button>
-
-
-
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-                onClick={handleCopy}
-              >
-                {copied ? 'Copied' : 'Copy'}
-              </Button>
             </div>
           </div>
         }
@@ -348,7 +394,7 @@ export function XmlValidatorPage() {
             onDrop={handleDrop}
           >
             {/* Left Header */}
-            <div className="flex items-center justify-between px-4 py-2.5 min-h-[46px] h-[46px] bg-neutral-50/80 border-b border-neutral-200 shrink-0">
+            <div className="flex items-center justify-between px-4 py-2 min-h-[46px] h-[46px] bg-neutral-50/80 border-b border-neutral-200 shrink-0">
               <div className="flex items-center gap-2">
                 {validationMode === 'xsd' ? (
                   <div className="inline-flex rounded-md p-0.5 bg-neutral-200 text-xs">
@@ -382,6 +428,50 @@ export function XmlValidatorPage() {
                 {activeFileName && validationMode === 'syntax' && (
                   <span className="text-[11px] text-neutral-400 font-mono">({activeFileName})</span>
                 )}
+              </div>
+
+              {/* Editor Top-Right Action Buttons: Upload, Clear, Copy */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-100 border border-neutral-200 rounded-md transition-all shadow-2xs cursor-pointer"
+                  title="Upload XML file"
+                >
+                  <Upload className="h-3.5 w-3.5 text-neutral-500" />
+                  <span>Upload</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  disabled={!inputXml && !activeFileName}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:text-rose-600 bg-white hover:bg-rose-50 border border-neutral-200 hover:border-rose-200 rounded-md transition-all shadow-2xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-neutral-600 disabled:hover:border-neutral-200"
+                  title="Clear editor"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-neutral-500 hover:text-rose-600" />
+                  <span>Clear</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  disabled={!inputXml}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-100 border border-neutral-200 rounded-md transition-all shadow-2xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-neutral-600"
+                  title="Copy XML"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      <span className="text-emerald-700 font-semibold">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5 text-neutral-500" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 

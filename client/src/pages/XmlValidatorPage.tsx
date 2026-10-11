@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   FileCheck2,
@@ -60,8 +60,6 @@ export function XmlValidatorPage() {
   const [copied, setCopied] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [showSearchNotice, setShowSearchNotice] = useState(true);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Derived input metrics
   const linesCount = inputXml ? inputXml.split(/\r?\n/).length : 0;
@@ -175,42 +173,6 @@ export function XmlValidatorPage() {
         description: 'Could not access clipboard.',
       });
     }
-  };
-
-  // File Upload
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      addToast({
-        type: 'error',
-        title: 'File too large',
-        description: 'Please upload an XML file under 5 MB for optimal in-browser performance.',
-      });
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      setInputXml(text);
-      setActiveFileName(file.name);
-      addToast({
-        type: 'success',
-        title: 'File loaded',
-        description: `${file.name} (${(file.size / 1024).toFixed(1)} KB)`,
-      });
-    };
-    reader.onerror = () => {
-      addToast({
-        type: 'error',
-        title: 'Read error',
-        description: 'Could not read the selected file.',
-      });
-    };
-    reader.readAsText(file);
-    e.target.value = '';
   };
 
   // Drag and Drop
@@ -352,15 +314,6 @@ export function XmlValidatorPage() {
         </div>
       )}
 
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".xml,.xsd,.wsdl,.soap,.txt"
-        className="hidden"
-        onChange={handleFileChange}
-      />
-
       <ToolWorkspaceLayout
         toolName="XML Validator"
         toolDescription="Validate XML well-formedness, pinpoint syntax errors with line/column markers, test XSD schemas, and diagnose SAP Integration Suite payloads with 100% in-browser privacy."
@@ -438,14 +391,7 @@ export function XmlValidatorPage() {
                 Auto-Fix Common Errors
               </Button>
 
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={<Upload className="h-3.5 w-3.5" />}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                Upload
-              </Button>
+
 
               <Button
                 variant="secondary"

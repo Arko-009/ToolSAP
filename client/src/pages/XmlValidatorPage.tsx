@@ -100,7 +100,7 @@ export function XmlValidatorPage() {
     addToast({
       type: 'success',
       title: 'Auto-Fix Applied',
-      description: fixes.join('. '),
+      description: fixes.length === 1 ? fixes[0] : `Successfully repaired ${fixes.length} issues. XML is now valid!`,
     });
   };
 

@@ -854,55 +854,231 @@ export function validateXmlStructure(xml: string): XmlValidationDiagnostic {
 }
 
 /**
- * Intelligent Auto-Fix for Common XML Syntax Mistakes
+ * Intelligent Multi-Pass Auto-Fix for Common XML Syntax Mistakes
  * 1. Escapes bare ampersands '&' -> '&amp;'
- * 2. Trims leading BOM / invisible characters preceding '<?xml'
- * 3. Normalizes smart/curly quotes
- * 4. Repairs mismatched element closing tags
+ * 2. Escapes bare '<' inside text -> '&lt;'
+ * 3. Trims leading BOM / invisible characters preceding '<?xml'
+ * 4. Normalizes smart/curly quotes
+ * 5. Repairs mismatched element closing tags (e.g. <department>...</departmen>)
+ * 6. Inserts missing closing tags for unclosed elements
+ * 7. Removes stray closing tags with no opening tag
+ * 8. Wraps multiple root elements in a <root>...</root> wrapper
+ * 9. Deduplicates duplicate attributes on elements
+ * 10. Closes unterminated comments and CDATA blocks
  */
 export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
   const fixes: string[] = [];
   let result = xml;
 
-  // 1. Trim leading BOM or whitespace before <?xml
-  if (/^\s*<\?xml/i.test(result) && !result.startsWith('<?xml')) {
-    result = result.replace(/^\s+<\?xml/i, '<?xml');
-    fixes.push('Removed whitespace preceding XML declaration <?xml');
+  if (!result || !result.trim()) {
+    return { fixedXml: result, fixes };
   }
 
-  // 2. Escape bare ampersands outside of entities and CDATA
-  // Match & that is NOT followed by (amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);
-  const bareAmpRegex = /&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g;
-  const ampMatches = (result.match(bareAmpRegex) || []).length;
-  if (ampMatches > 0) {
-    result = result.replace(bareAmpRegex, '&amp;');
-    fixes.push(`Escaped ${ampMatches} unescaped ampersand(s) to &amp;`);
-  }
+  // Run up to 4 iterative passes to resolve cascading dependencies
+  for (let pass = 0; pass < 4; pass++) {
+    const passFixes: string[] = [];
+    const prevResult = result;
 
-  // 3. Replace smart/curly quotes in attributes
-  if (/[\u201C\u201D\u2018\u2019]/.test(result)) {
-    result = result
-      .replace(/[\u201C\u201D]/g, '"')
-      .replace(/[\u2018\u2019]/g, "'");
-    fixes.push('Replaced smart/curly quotes with standard XML quotes');
-  }
+    // 1. Whitespace / BOM before <?xml
+    if (/^\s*<\?xml/i.test(result) && !result.startsWith('<?xml')) {
+      result = result.replace(/^\s+<\?xml/i, '<?xml');
+      passFixes.push('Removed whitespace preceding XML declaration <?xml');
+    }
 
-  // 4. Auto-fix mismatched closing tags
-  const scanned = scanXmlErrors(result);
-  for (const err of scanned) {
-    if (err.category === 'tag-mismatch') {
-      const match = err.message.match(
-        /mismatch:\s*([a-zA-Z0-9_.:-]+)(?:\s+line\s+\d+)?\s+and\s+([a-zA-Z0-9_.:-]+)/i
-      );
-      if (match) {
-        const expectedTag = match[1];
-        const actualTag = match[2];
-        const targetClosing = `</${actualTag}>`;
-        if (result.includes(targetClosing)) {
-          result = result.replace(targetClosing, `</${expectedTag}>`);
-          fixes.push(`Corrected closing tag </${actualTag}> to </${expectedTag}>`);
+    // Misplaced <?xml inside body
+    const xmlDeclIdx = result.indexOf('<?xml');
+    if (xmlDeclIdx > 0) {
+      const declEnd = result.indexOf('?>', xmlDeclIdx);
+      if (declEnd !== -1) {
+        const decl = result.substring(xmlDeclIdx, declEnd + 2);
+        const withoutDecl = result.substring(0, xmlDeclIdx) + result.substring(declEnd + 2);
+        result = `${decl}\n${withoutDecl.trim()}`;
+        passFixes.push('Moved misplaced <?xml ...?> declaration to the top');
+      }
+    }
+
+    // 2. Escape bare ampersands outside of entities and CDATA
+    const bareAmpRegex = /&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g;
+    const ampMatches = (result.match(bareAmpRegex) || []).length;
+    if (ampMatches > 0) {
+      result = result.replace(bareAmpRegex, '&amp;');
+      passFixes.push(`Escaped ${ampMatches} bare ampersand(s) to &amp;`);
+    }
+
+    // 3. Escape bare '<' not starting a valid tag or declaration
+    const bareLtRegex = /<(?![a-zA-Z_/?!])/g;
+    const ltMatches = (result.match(bareLtRegex) || []).length;
+    if (ltMatches > 0) {
+      result = result.replace(bareLtRegex, '&lt;');
+      passFixes.push(`Escaped ${ltMatches} bare '<' symbol(s) to &lt;`);
+    }
+
+    // 4. Normalize smart / curly quotes
+    if (/[\u201C\u201D\u2018\u2019]/.test(result)) {
+      result = result
+        .replace(/[\u201C\u201D]/g, '"')
+        .replace(/[\u2018\u2019]/g, "'");
+      passFixes.push('Normalized smart/curly quotes to standard XML quotes');
+    }
+
+    // 5. Close unclosed comments or CDATA
+    if (result.includes('<!--') && !result.includes('-->')) {
+      result = `${result}\n-->`;
+      passFixes.push("Closed unterminated comment with '-->'");
+    }
+    if (result.includes('<![CDATA[') && !result.includes(']]>')) {
+      result = `${result}\n]]>`;
+      passFixes.push("Closed unterminated CDATA with ']]>'");
+    }
+
+    // 6. Scan structural errors
+    const scannedErrors = scanXmlErrors(result);
+
+    // 6a. Multiple Root Elements
+    const hasMultiRoots = scannedErrors.some((e) => e.category === 'multiple-roots');
+    if (hasMultiRoots) {
+      const xmlDeclMatch = result.match(/^\s*<\?xml[^>]*\?>\s*/i);
+      if (xmlDeclMatch) {
+        const decl = xmlDeclMatch[0].trim();
+        const body = result.substring(xmlDeclMatch[0].length);
+        result = `${decl}\n<root>\n${body}\n</root>`;
+      } else {
+        result = `<root>\n${result}\n</root>`;
+      }
+      passFixes.push('Enclosed multiple root elements in a <root>...</root> wrapper');
+      for (const f of passFixes) {
+        if (!fixes.includes(f)) fixes.push(f);
+      }
+      continue;
+    }
+
+    // 6b. Fix tag mismatches, unclosed tags, and duplicate attributes line-by-line
+    const lines = result.split(/\r?\n/);
+    let linesModified = false;
+
+    for (const err of scannedErrors) {
+      // Tag Mismatch: <expectedTag> closed with </actualTag>
+      if (err.category === 'tag-mismatch' && err.line) {
+        const match = err.message.match(
+          /mismatch:\s*([a-zA-Z0-9_.:-]+)(?:\s+line\s+\d+)?\s+and\s+([a-zA-Z0-9_.:-]+)/i
+        );
+        if (match) {
+          const expectedTag = match[1];
+          const actualTag = match[2];
+          const targetRegex = new RegExp(`</\\s*${actualTag}\\s*>`, 'i');
+
+          // Target exact line first
+          const lineIdx = err.line - 1;
+          if (lineIdx >= 0 && lineIdx < lines.length && targetRegex.test(lines[lineIdx])) {
+            lines[lineIdx] = lines[lineIdx].replace(targetRegex, `</${expectedTag}>`);
+            linesModified = true;
+            passFixes.push(`Line ${err.line}: Corrected </${actualTag}> to </${expectedTag}>`);
+          } else {
+            // Check adjacent lines in case of wrapping
+            let fixedNearby = false;
+            for (const offset of [-1, 1, -2, 2]) {
+              const checkIdx = lineIdx + offset;
+              if (checkIdx >= 0 && checkIdx < lines.length && targetRegex.test(lines[checkIdx])) {
+                lines[checkIdx] = lines[checkIdx].replace(targetRegex, `</${expectedTag}>`);
+                linesModified = true;
+                passFixes.push(`Line ${checkIdx + 1}: Corrected </${actualTag}> to </${expectedTag}>`);
+                fixedNearby = true;
+                break;
+              }
+            }
+            if (!fixedNearby) {
+              const joined = lines.join('\n');
+              if (targetRegex.test(joined)) {
+                result = joined.replace(targetRegex, `</${expectedTag}>`);
+                lines.splice(0, lines.length, ...result.split(/\r?\n/));
+                linesModified = true;
+                passFixes.push(`Corrected closing tag </${actualTag}> to </${expectedTag}>`);
+              }
+            }
+          }
         }
       }
+
+      // Unclosed Tag: <tagName> opened but never closed before </closingTag>
+      if (err.category === 'unclosed-tag') {
+        const matchBefore = err.message.match(
+          /Expected\s+<\/([a-zA-Z0-9_.:-]+)>\s+before\s+<\/([a-zA-Z0-9_.:-]+)>/i
+        );
+        if (matchBefore && err.line) {
+          const unclosedTag = matchBefore[1];
+          const nextTag = matchBefore[2];
+          const targetNextRegex = new RegExp(`(</\\s*${nextTag}\\s*>)`, 'i');
+          const lineIdx = err.line - 1;
+          if (lineIdx >= 0 && lineIdx < lines.length && targetNextRegex.test(lines[lineIdx])) {
+            lines[lineIdx] = lines[lineIdx].replace(targetNextRegex, `</${unclosedTag}>$1`);
+            linesModified = true;
+            passFixes.push(`Line ${err.line}: Inserted missing closing tag </${unclosedTag}>`);
+          }
+        } else {
+          const matchPremature = err.message.match(/<([a-zA-Z0-9_.:-]+)>\s+opened\s+on\s+line\s+(\d+)/i);
+          if (matchPremature) {
+            const unclosedTag = matchPremature[1];
+            lines.push(`</${unclosedTag}>`);
+            linesModified = true;
+            passFixes.push(`Appended missing closing tag </${unclosedTag}>`);
+          }
+        }
+      }
+
+      // Duplicate Attribute on element
+      if (err.category === 'duplicate-attribute' && err.line) {
+        const attrMatch = err.message.match(/Duplicate attribute '([a-zA-Z0-9_.:-]+)'/i);
+        if (attrMatch) {
+          const attrName = attrMatch[1];
+          const lineIdx = err.line - 1;
+          if (lineIdx >= 0 && lineIdx < lines.length) {
+            const dupAttrRegex = new RegExp(
+              `(\\b${attrName}\\s*=\\s*(?:"[^"]*"|'[^']*'))([\\s\\S]*?)(\\b${attrName}\\s*=\\s*(?:"[^"]*"|'[^']*'))`
+            );
+            if (dupAttrRegex.test(lines[lineIdx])) {
+              lines[lineIdx] = lines[lineIdx].replace(dupAttrRegex, '$1$2');
+              linesModified = true;
+              passFixes.push(`Line ${err.line}: Removed duplicate attribute '${attrName}'`);
+            }
+          }
+        }
+      }
+
+      // Stray closing tag with no open tag
+      if (err.category === 'tag-mismatch' && err.message.includes('with no matching open tag') && err.line) {
+        const strayMatch = err.message.match(/Unexpected closing tag <\/([a-zA-Z0-9_.:-]+)>/i);
+        if (strayMatch) {
+          const strayTag = strayMatch[1];
+          const lineIdx = err.line - 1;
+          if (lineIdx >= 0 && lineIdx < lines.length) {
+            const strayRegex = new RegExp(`</\\s*${strayTag}\\s*>`);
+            if (strayRegex.test(lines[lineIdx])) {
+              lines[lineIdx] = lines[lineIdx].replace(strayRegex, '');
+              linesModified = true;
+              passFixes.push(`Line ${err.line}: Removed stray closing tag </${strayTag}>`);
+            }
+          }
+        }
+      }
+    }
+
+    if (linesModified) {
+      result = lines.join('\n');
+    }
+
+    for (const f of passFixes) {
+      if (!fixes.includes(f)) {
+        fixes.push(f);
+      }
+    }
+
+    if (result === prevResult) {
+      break;
+    }
+
+    const testDiag = validateXmlStructure(result);
+    if (testDiag.isValid) {
+      break;
     }
   }
 

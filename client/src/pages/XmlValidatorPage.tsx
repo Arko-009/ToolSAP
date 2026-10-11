@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   FileCheck2,
   CheckCircle2,
@@ -7,9 +7,7 @@ import {
   AlertTriangle,
   Sparkles,
   Copy,
-  Download,
   Upload,
-  Trash2,
   FileCode,
   Shield,
   Clock,
@@ -46,7 +44,6 @@ const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 export function XmlValidatorPage() {
   const { addToast } = useToastContext();
-  const navigate = useNavigate();
 
   // State
   const [inputXml, setInputXml] = useState(SAP_SOAP_VALID);
@@ -178,25 +175,6 @@ export function XmlValidatorPage() {
         description: 'Could not access clipboard.',
       });
     }
-  };
-
-  // Download
-  const handleDownload = () => {
-    if (!inputXml) return;
-    const blob = new Blob([inputXml], { type: 'application/xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = activeFileName || 'validated-document.xml';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    addToast({
-      type: 'success',
-      title: 'File downloaded',
-      description: `Saved as ${activeFileName || 'validated-document.xml'}`,
-    });
   };
 
   // File Upload
@@ -463,16 +441,6 @@ export function XmlValidatorPage() {
               <Button
                 variant="secondary"
                 size="sm"
-                icon={<FileCode className="h-3.5 w-3.5 text-primary-600" />}
-                onClick={() => navigate('/tools/xml-formatter')}
-                title="Format and beautify this XML in XML Formatter"
-              >
-                Open in Formatter
-              </Button>
-
-              <Button
-                variant="secondary"
-                size="sm"
                 icon={<Upload className="h-3.5 w-3.5" />}
                 onClick={() => fileInputRef.current?.click()}
               >
@@ -486,27 +454,6 @@ export function XmlValidatorPage() {
                 onClick={handleCopy}
               >
                 {copied ? 'Copied' : 'Copy'}
-              </Button>
-
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={<Download className="h-3.5 w-3.5" />}
-                onClick={handleDownload}
-              >
-                Download
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                icon={<Trash2 className="h-3.5 w-3.5 text-neutral-400" />}
-                onClick={() => {
-                  setInputXml('');
-                  setActiveFileName(null);
-                }}
-              >
-                Clear
               </Button>
             </div>
           </div>

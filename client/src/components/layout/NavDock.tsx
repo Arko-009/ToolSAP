@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   motion,

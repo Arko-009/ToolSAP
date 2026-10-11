@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import {
   FileCode,
+  FileCheck,
   Sparkles,
   Minimize2,
   Copy,
@@ -372,6 +373,17 @@ export function XmlFormatterPage() {
               >
                 Minify XML
               </Button>
+
+              <Link to="/tools/xml-validator">
+                <Button
+                  variant="secondary"
+                  size="md"
+                  icon={<FileCheck className="h-4 w-4 text-emerald-600" />}
+                  title="Validate XML well-formedness and schemas"
+                >
+                  Validate XML
+                </Button>
+              </Link>
 
               {/* Options Toggle */}
               <div className="relative">
@@ -776,6 +788,13 @@ export function XmlFormatterPage() {
                 Need schema validation or XSD creation for your message mappings?
               </p>
               <div className="flex flex-col gap-1.5 text-xs">
+                <Link
+                  to="/tools/xml-validator"
+                  className="text-emerald-600 hover:text-emerald-700 font-semibold inline-flex items-center gap-1"
+                >
+                  <span>XML Validator &amp; Schema Checker</span>
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
                 <Link
                   to="/tools"
                   className="text-primary-600 hover:text-primary-700 font-semibold inline-flex items-center gap-1"

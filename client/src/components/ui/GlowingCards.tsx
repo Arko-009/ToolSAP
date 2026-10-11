@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useRef, useEffect, useCallback } from 'react';
+import { createContext, useContext, useRef, useEffect } from 'react';
 import { motion, useMotionTemplate, useMotionValue, useSpring } from 'framer-motion';
 
 interface GlowingCardsContextType {

@@ -226,7 +226,7 @@ export function Footer() {
                 </li>
                 <li>
                   <Link
-                    to="/tools/xpath-tester"
+                    to="/tools#xpath-tester"
                     className="flex items-center gap-3 text-sm text-neutral-700 hover:text-neutral-900 transition-colors group"
                   >
                     <div className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-700 shrink-0 group-hover:bg-slate-200 transition-colors">

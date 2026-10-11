@@ -541,11 +541,15 @@ export function XmlValidatorPage() {
                     PASS · Valid XML
                   </Badge>
                 ) : (
-                  <Badge variant="error" size="sm" dot>
-                    {activeErrors.length > 1
-                      ? `FAIL · ${activeErrors.length} Syntax Mistakes`
-                      : 'FAIL · Syntax Error'}
-                  </Badge>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={<Sparkles className="h-3.5 w-3.5" />}
+                    onClick={handleAutoFix}
+                    className="bg-rose-600 hover:bg-rose-700 text-white shadow-2xs"
+                  >
+                    Auto-Fix with ToolSAP
+                  </Button>
                 )}
               </div>
             </div>
@@ -679,16 +683,7 @@ export function XmlValidatorPage() {
                                 </div>
                               )}
 
-                              <div className="mt-3.5 flex items-center justify-between">
-                                <Button
-                                  variant="primary"
-                                  size="sm"
-                                  icon={<Sparkles className="h-3.5 w-3.5" />}
-                                  onClick={handleAutoFix}
-                                  className="bg-rose-600 hover:bg-rose-700 text-white"
-                                >
-                                  Auto-Fix with ToolSAP
-                                </Button>
+                              <div className="mt-3 pt-2.5 border-t border-rose-200/60 flex items-center justify-end">
                                 <span className="text-[11px] text-neutral-400 font-mono">
                                   Error code: {err.category || 'xml-syntax'}
                                 </span>

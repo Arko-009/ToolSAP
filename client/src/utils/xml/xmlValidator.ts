@@ -940,21 +940,43 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
       return `<${tagName}${fixedAttrs}>`;
     });
 
-    // 1. Whitespace / BOM before <?xml
-    if (/^\s*<\?xml/i.test(result) && !result.startsWith('<?xml')) {
-      result = result.replace(/^\s+<\?xml/i, '<?xml');
-      passFixes.push('Removed whitespace preceding XML declaration <?xml');
+    // 1. Handle <?xml ...?> declarations:
+    // Move first misplaced declaration to the top, and remove invalid duplicate/nested declarations from the body
+    const xmlDeclRegex = /<\?xml\b[^>]*\?>/gi;
+    const decls: { match: string; index: number; length: number }[] = [];
+    let dMatch: RegExpExecArray | null;
+    while ((dMatch = xmlDeclRegex.exec(result)) !== null) {
+      decls.push({ match: dMatch[0], index: dMatch.index, length: dMatch[0].length });
     }
 
-    // Misplaced <?xml inside body
-    const xmlDeclIdx = result.indexOf('<?xml');
-    if (xmlDeclIdx > 0) {
-      const declEnd = result.indexOf('?>', xmlDeclIdx);
-      if (declEnd !== -1) {
-        const decl = result.substring(xmlDeclIdx, declEnd + 2);
-        const withoutDecl = result.substring(0, xmlDeclIdx) + result.substring(declEnd + 2);
-        result = `${decl}\n${withoutDecl.trim()}`;
-        passFixes.push('Moved misplaced <?xml ...?> declaration to the top');
+    if (decls.length > 0) {
+      const first = decls[0];
+      const preceding = result.substring(0, first.index);
+
+      if (preceding.trim().length > 0) {
+        // First declaration is misplaced inside body, move it to the top
+        const withoutFirst = result.substring(0, first.index) + result.substring(first.index + first.length);
+        result = `${first.match}\n${withoutFirst.trim()}`;
+        passFixes.push('Moved misplaced <?xml ...?> declaration to the top of the document');
+      } else if (first.index > 0) {
+        // Preceded only by whitespace/BOM
+        result = result.replace(/^\s+<\?xml/i, '<?xml');
+        passFixes.push('Removed whitespace preceding XML declaration <?xml');
+      }
+
+      // Remove any subsequent/nested <?xml ...?> declarations inside the body
+      const firstEnd = result.indexOf('?>');
+      if (firstEnd !== -1) {
+        const topPart = result.substring(0, firstEnd + 2);
+        const bodyPart = result.substring(firstEnd + 2);
+        if (/<\?xml\b[^>]*\?>/i.test(bodyPart)) {
+          let cleanedBody = bodyPart.replace(/^[ \t]*<\?xml\b[^>]*\?>[ \t]*\r?\n?/gmi, '');
+          if (/<\?xml\b[^>]*\?>/i.test(cleanedBody)) {
+            cleanedBody = cleanedBody.replace(/<\?xml\b[^>]*\?>/gi, '');
+          }
+          result = topPart + cleanedBody;
+          passFixes.push('Removed invalid nested <?xml ...?> declaration from document body');
+        }
       }
     }
 

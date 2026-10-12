@@ -540,15 +540,20 @@ export function scanXmlErrors(xml: string): XmlValidationError[] {
         break;
       }
       if (xml.substring(i, i + 5).toLowerCase() === '<?xml') {
-        const preceding = xml.substring(0, i);
-        if (preceding.trim().length > 0) {
+        if (i > 0) {
+          const preceding = xml.substring(0, i);
+          const isOnlyWhitespace = preceding.trim().length === 0;
           errors.push({
-            message: 'XML declaration (<?xml ...?>) is misplaced. It must be the very first token in the document.',
+            message: isOnlyWhitespace
+              ? 'XML declaration (<?xml ...?>) is misplaced. It is preceded by blank lines or whitespace and must be the very first characters in the document.'
+              : 'XML declaration (<?xml ...?>) is misplaced. It must be the very first token in the document.',
             line: loc.line,
             column: loc.column,
             snippet: generateSnippet(xml, loc.line, loc.column),
             category: 'declaration-error',
-            suggestion: 'Move <?xml ...?> to the beginning of the file without preceding tags or text.',
+            code: 'ERR_DECLARATION_MISPLACED',
+            classification: 'safe-automatic',
+            suggestion: 'The XML declaration <?xml version="1.0"?> must be the very first characters in the document with no preceding spaces, linebreaks, or BOM.',
           });
         }
       }
@@ -1340,6 +1345,19 @@ export function autoFixXml(xml: string): AutoFixResult {
       classification: 'safe-automatic',
       confidence: 'high',
       description: 'Stripped UTF-8 Byte Order Mark (BOM) from start of document',
+    });
+  }
+
+  // 1b. Strip leading blank lines and whitespace preceding <?xml declaration
+  if (/^\s+<\?xml/i.test(result)) {
+    result = result.replace(/^\s+<\?xml/i, '<?xml');
+    fixes.push('Removed blank lines and whitespace preceding <?xml declaration');
+    diffItems.push({
+      code: 'ERR_DECLARATION_MISPLACED',
+      category: 'declaration-error',
+      classification: 'safe-automatic',
+      confidence: 'high',
+      description: 'Stripped leading blank lines/whitespace preceding <?xml declaration so it starts on line 1, column 1',
     });
   }
 

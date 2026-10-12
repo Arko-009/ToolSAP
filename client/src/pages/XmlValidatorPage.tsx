@@ -33,6 +33,7 @@ import {
   validateAgainstXsd,
   type XmlValidationDiagnostic,
   type XsdValidationResult,
+  type AutoFixReport,
   SAMPLE_SAP_XSD,
 } from '@/utils/xml/xmlValidator';
 
@@ -53,6 +54,7 @@ export function XmlValidatorPage() {
     validateXmlStructure('')
   );
   const [xsdResult, setXsdResult] = useState<XsdValidationResult | null>(null);
+  const [lastFixReport, setLastFixReport] = useState<AutoFixReport | null>(null);
   const [copied, setCopied] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [showSearchNotice, setShowSearchNotice] = useState(true);
@@ -86,12 +88,14 @@ export function XmlValidatorPage() {
   // Handle Auto-Fix
   const handleAutoFix = () => {
     if (!inputXml.trim()) return;
-    const { fixedXml, fixes } = autoFixXml(inputXml);
+    const { fixedXml, fixes, report } = autoFixXml(inputXml);
+    setLastFixReport(report);
+
     if (fixes.length === 0) {
       addToast({
         type: 'info',
         title: 'No automatic fixes needed',
-        description: 'No unescaped characters, BOM, or quotes issues were detected.',
+        description: 'Document is already valid or no safe automated fixes could be determined.',
       });
       return;
     }
@@ -100,7 +104,7 @@ export function XmlValidatorPage() {
     addToast({
       type: 'success',
       title: 'Auto-Fix Applied',
-      description: fixes.length === 1 ? fixes[0] : `Successfully repaired ${fixes.length} issues. XML is now valid!`,
+      description: fixes.length === 1 ? fixes[0] : `Successfully repaired ${fixes.length} issues in ${report.totalPasses} pass${report.totalPasses > 1 ? 'es' : ''}.`,
     });
   };
 
@@ -576,6 +580,93 @@ export function XmlValidatorPage() {
                 </div>
               ) : (
                 <div className="p-4 space-y-4">
+                  {/* Auto-Fix Audit & Diff Card */}
+                  {lastFixReport && lastFixReport.fixes.length > 0 && (
+                    <Card padding="md" className="border-indigo-200 bg-linear-to-br from-indigo-50/70 to-purple-50/40 shadow-xs">
+                      <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-indigo-200/70">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                            <Sparkles className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-indigo-950">Auto-Fix Engine Audit & Diff</h4>
+                            <p className="text-[11px] text-indigo-700 font-medium">
+                              {lastFixReport.fixes.length} correction{lastFixReport.fixes.length > 1 ? 's' : ''} applied across {lastFixReport.totalPasses} pass{lastFixReport.totalPasses > 1 ? 'es' : ''} ({lastFixReport.executionTimeMs}ms)
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant="primary" size="sm">
+                          {lastFixReport.finalValid ? 'REPAIRED & VERIFIED' : 'PARTIALLY REPAIRED'}
+                        </Badge>
+                      </div>
+
+                      {/* Security Warnings if any */}
+                      {lastFixReport.securityWarnings.length > 0 && (
+                        <div className="mb-3 p-2.5 rounded-lg bg-amber-100/80 border border-amber-300 text-amber-900 text-xs flex items-start gap-2">
+                          <Shield className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5">
+                            <span className="font-bold">Security Hardening Triggered:</span>
+                            {lastFixReport.securityWarnings.map((w, wIdx) => (
+                              <p key={wIdx} className="text-[11px] text-amber-800">{w}</p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Changes List */}
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {lastFixReport.fixes.map((item, fIdx) => (
+                          <div
+                            key={fIdx}
+                            className="p-2.5 rounded-lg bg-white/90 border border-indigo-100 flex flex-col gap-1 text-xs shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between gap-1 flex-wrap">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                    item.classification === 'safe-automatic'
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                      : item.classification === 'confirmation-required'
+                                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                      : 'bg-purple-100 text-purple-800 border border-purple-200'
+                                  }`}
+                                >
+                                  {item.classification === 'safe-automatic'
+                                    ? 'Safe Fix'
+                                    : item.classification === 'confirmation-required'
+                                    ? 'Decision Fix'
+                                    : 'Diagnosis'}
+                                </span>
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-neutral-100 text-neutral-700 border border-neutral-200 font-semibold">
+                                  {item.code}
+                                </span>
+                                {item.line !== undefined && (
+                                  <span className="text-[10px] font-mono text-neutral-500">
+                                    Line {item.line}
+                                  </span>
+                                )}
+                              </div>
+                              <span
+                                className={`text-[10px] font-semibold ${
+                                  item.confidence === 'high'
+                                    ? 'text-emerald-600'
+                                    : item.confidence === 'medium'
+                                    ? 'text-amber-600'
+                                    : 'text-neutral-500'
+                                }`}
+                              >
+                                Confidence: {item.confidence.toUpperCase()}
+                              </span>
+                            </div>
+                            <p className="text-neutral-800 text-[11px] font-mono leading-relaxed pl-0.5">
+                              {item.description}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  )}
+
                   {/* Status Card */}
                   {isActuallyValid ? (
                     <Card padding="lg" className="border-emerald-200 bg-emerald-50/60 shadow-xs">

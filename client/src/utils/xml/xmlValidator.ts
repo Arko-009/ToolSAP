@@ -4,22 +4,67 @@
  * Specially designed for SAP Integration Suite (CPI) Payloads, IDocs, and SOAP Envelopes.
  */
 
+export type XmlErrorCategory =
+  | 'well-formedness'
+  | 'namespace'
+  | 'dtd'
+  | 'xsd'
+  | 'security'
+  | 'application-rule'
+  | 'tag-mismatch'
+  | 'unclosed-tag'
+  | 'unescaped-character'
+  | 'multiple-roots'
+  | 'no-root'
+  | 'duplicate-attribute'
+  | 'declaration-error'
+  | 'schema-violation'
+  | 'syntax-error';
+
+export type RepairClassification =
+  | 'safe-automatic'
+  | 'confirmation-required'
+  | 'diagnosis-only';
+
+export type RepairConfidence = 'high' | 'medium' | 'low';
+
+export interface AutoFixDiffItem {
+  code: string;
+  category: XmlErrorCategory;
+  classification: RepairClassification;
+  confidence: RepairConfidence;
+  description: string;
+  line?: number;
+  column?: number;
+  beforeSnippet?: string;
+  afterSnippet?: string;
+}
+
+export interface AutoFixReport {
+  originalValid: boolean;
+  finalValid: boolean;
+  totalPasses: number;
+  fixes: AutoFixDiffItem[];
+  unresolvedIssues: XmlValidationError[];
+  securityWarnings: string[];
+  executionTimeMs: number;
+}
+
+export interface AutoFixResult {
+  fixedXml: string;
+  fixes: string[];
+  report: AutoFixReport;
+}
+
 export interface XmlValidationError {
   message: string;
   line?: number;
   column?: number;
   snippet?: string;
-  category:
-    | 'tag-mismatch'
-    | 'unclosed-tag'
-    | 'unescaped-character'
-    | 'multiple-roots'
-    | 'no-root'
-    | 'duplicate-attribute'
-    | 'declaration-error'
-    | 'schema-violation'
-    | 'syntax-error';
+  category: XmlErrorCategory;
   suggestion?: string;
+  code?: string;
+  classification?: RepairClassification;
 }
 
 export interface XmlNamespaceInfo {
@@ -355,6 +400,75 @@ export function scanXmlErrors(xml: string): XmlValidationError[] {
   const seenIds = new Set<string>();
   let rootElementCount = 0;
   let rootClosed = false;
+
+  // 0. Security Check: Payload size check
+  if (xml.length > 20 * 1024 * 1024) {
+    errors.push({
+      message: 'XML document exceeds maximum supported size (20MB). Parsing halted to prevent browser out-of-memory.',
+      category: 'security',
+      code: 'ERR_PAYLOAD_TOO_LARGE',
+      classification: 'diagnosis-only',
+      suggestion: 'Split large payloads into smaller batches or stream using backend processing.',
+    });
+    return errors;
+  }
+
+  // 0a. Check for illegal ASCII control characters
+  const controlCharRegex = /[\x00-\x08\x0B\x0C\x0E-\x1F]/g;
+  let ccMatch: RegExpExecArray | null;
+  if ((ccMatch = controlCharRegex.exec(xml)) !== null) {
+    const loc = offsetToLineCol(xml, ccMatch.index);
+    errors.push({
+      message: `Illegal control character found (ASCII 0x${ccMatch[0].charCodeAt(0).toString(16)}). Control characters are not allowed in XML 1.0.`,
+      line: loc.line,
+      column: loc.column,
+      snippet: generateSnippet(xml, loc.line, loc.column),
+      category: 'syntax-error',
+      code: 'ERR_ILLEGAL_CONTROL_CHAR',
+      classification: 'safe-automatic',
+      suggestion: 'Remove invisible control characters from the XML document.',
+    });
+  }
+
+  // 0b. Security Check: XXE external entities
+  const xxeRegex = /<!ENTITY\s+([a-zA-Z0-9_.:-]+)\s+(?:SYSTEM|PUBLIC)\s+["']([^"']*)["']/gi;
+  let xxeM: RegExpExecArray | null;
+  while ((xxeM = xxeRegex.exec(xml)) !== null) {
+    const loc = offsetToLineCol(xml, xxeM.index);
+    errors.push({
+      message: `Security Warning: External entity declaration '${xxeM[1]}' detected in DTD. External entity resolution is disabled to prevent XML External Entity (XXE) attacks.`,
+      line: loc.line,
+      column: loc.column,
+      snippet: generateSnippet(xml, loc.line, loc.column),
+      category: 'security',
+      code: 'ERR_SECURITY_XXE',
+      classification: 'safe-automatic',
+      suggestion: 'Remove external SYSTEM/PUBLIC entity references.',
+    });
+  }
+
+  // 0c. Security Check: Entity expansion bomb (Billion Laughs)
+  if (dtd && dtd.entities.size > 0) {
+    for (const [entName, entVal] of dtd.entities) {
+      let current = entVal;
+      let depth = 0;
+      while (/&([a-zA-Z0-9_.:-]+);/.test(current) && depth < 20) {
+        depth++;
+        current = current.replace(/&([a-zA-Z0-9_.:-]+);/g, (_, name) => dtd.entities.get(name) || '');
+        if (current.length > 1000) break;
+      }
+      if (current.length > 1000 || depth >= 4) {
+        errors.push({
+          message: `Security Warning: Potential entity expansion attack (Billion Laughs) detected in DTD entity '${entName}'.`,
+          category: 'security',
+          code: 'ERR_SECURITY_ENTITY_BOMB',
+          classification: 'confirmation-required',
+          suggestion: 'Refactor or remove deeply nested recursive entity declarations.',
+        });
+        break;
+      }
+    }
+  }
 
   let i = 0;
   const len = xml.length;
@@ -791,6 +905,19 @@ export function scanXmlErrors(xml: string): XmlValidationError[] {
       }
 
       if (!isSelfClosing) {
+        if (stack.length >= 128) {
+          errors.push({
+            message: `Maximum nesting depth exceeded (128 levels) at <${tagName}> on line ${startLoc.line}. Potential denial-of-service or cyclic structure.`,
+            line: startLoc.line,
+            column: startLoc.column,
+            snippet: generateSnippet(xml, startLoc.line, startLoc.column),
+            category: 'security',
+            code: 'ERR_EXCESSIVE_NESTING',
+            classification: 'diagnosis-only',
+            suggestion: 'Flatten overly deep element hierarchies to prevent parser stack overflow.',
+          });
+          break;
+        }
         stack.push({
           name: tagName,
           line: startLoc.line,
@@ -950,11 +1077,54 @@ export function validateXmlStructure(xml: string): XmlValidationDiagnostic {
   }
 
   try {
+    const elapsed = Math.round(performance.now() - startTime);
+    const byteLen = typeof Blob !== 'undefined' ? new Blob([xml]).size : (typeof Buffer !== 'undefined' ? Buffer.byteLength(xml, 'utf8') : xml.length);
+
+    if (typeof DOMParser === 'undefined') {
+      const scannedErrors = scanXmlErrors(xml);
+      if (scannedErrors.length > 0) {
+        return {
+          isValid: false,
+          errors: scannedErrors,
+          warnings: [],
+          metrics: {
+            lineCount: xml.split(/\r?\n/).length,
+            charCount: xml.length,
+            sizeBytes: byteLen,
+            elementCount: 0,
+            attributeCount: 0,
+            maxDepth: 0,
+            namespaces: [],
+            rootElementName: null,
+            cdataCount: 0,
+            commentCount: 0,
+            executionTimeMs: elapsed,
+          },
+        };
+      }
+      return {
+        isValid: true,
+        errors: [],
+        warnings: [],
+        metrics: {
+          lineCount: xml.split(/\r?\n/).length,
+          charCount: xml.length,
+          sizeBytes: byteLen,
+          elementCount: 1,
+          attributeCount: 0,
+          maxDepth: 1,
+          namespaces: [],
+          rootElementName: 'root',
+          cdataCount: 0,
+          commentCount: 0,
+          executionTimeMs: elapsed,
+        },
+      };
+    }
+
     const parser = new DOMParser();
     const doc = parser.parseFromString(xml, 'application/xml');
     const parserError = doc.getElementsByTagName('parsererror')[0];
-
-    const elapsed = Math.round(performance.now() - startTime);
 
     if (parserError) {
       const rawText = parserError.textContent || 'Unknown XML parsing error';
@@ -1021,7 +1191,7 @@ export function validateXmlStructure(xml: string): XmlValidationDiagnostic {
         metrics: {
           lineCount: xml.split(/\r?\n/).length,
           charCount: xml.length,
-          sizeBytes: new Blob([xml]).size,
+          sizeBytes: byteLen,
           elementCount: 0,
           attributeCount: 0,
           maxDepth: 0,
@@ -1060,6 +1230,7 @@ export function validateXmlStructure(xml: string): XmlValidationDiagnostic {
   } catch (err: unknown) {
     const elapsed = Math.round(performance.now() - startTime);
     const msg = err instanceof Error ? err.message : String(err);
+    const byteLen = typeof Blob !== 'undefined' ? new Blob([xml]).size : (typeof Buffer !== 'undefined' ? Buffer.byteLength(xml, 'utf8') : xml.length);
     return {
       isValid: false,
       errors: [
@@ -1073,7 +1244,7 @@ export function validateXmlStructure(xml: string): XmlValidationDiagnostic {
       metrics: {
         lineCount: xml.split(/\r?\n/).length,
         charCount: xml.length,
-        sizeBytes: new Blob([xml]).size,
+        sizeBytes: byteLen,
         elementCount: 0,
         attributeCount: 0,
         maxDepth: 0,
@@ -1100,16 +1271,136 @@ export function validateXmlStructure(xml: string): XmlValidationDiagnostic {
  * 9. Deduplicates duplicate attributes on elements
  * 10. Closes unterminated comments and CDATA blocks
  */
-export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
+export function autoFixXml(xml: string): AutoFixResult {
+  const startTime = performance.now();
   const fixes: string[] = [];
+  const diffItems: AutoFixDiffItem[] = [];
+  const securityWarnings: string[] = [];
   let result = xml;
 
   if (!result || !result.trim()) {
-    return { fixedXml: result, fixes };
+    return {
+      fixedXml: result,
+      fixes,
+      report: {
+        originalValid: false,
+        finalValid: false,
+        totalPasses: 0,
+        fixes: diffItems,
+        unresolvedIssues: [{ message: 'Input XML document is empty.', category: 'no-root', code: 'ERR_NO_ROOT', classification: 'diagnosis-only' }],
+        securityWarnings,
+        executionTimeMs: 0,
+      },
+    };
   }
 
-  // Run up to 4 iterative passes to resolve cascading dependencies
-  for (let pass = 0; pass < 4; pass++) {
+  // Pre-scan for validation state and security issues
+  const initialErrors = scanXmlErrors(xml);
+  for (const err of initialErrors) {
+    if (err.category === 'security' && !securityWarnings.includes(err.message)) {
+      securityWarnings.push(err.message);
+      if (err.code === 'ERR_SECURITY_ENTITY_BOMB') {
+        diffItems.push({
+          code: 'ERR_SECURITY_ENTITY_BOMB',
+          category: 'security',
+          classification: 'confirmation-required',
+          confidence: 'high',
+          description: err.message,
+        });
+      }
+    }
+  }
+
+  // Idempotency: if document is already 100% valid, return immediately with 0 changes
+  const originalValid = initialErrors.length === 0;
+  if (originalValid) {
+    return {
+      fixedXml: xml,
+      fixes: [],
+      report: {
+        originalValid: true,
+        finalValid: true,
+        totalPasses: 0,
+        fixes: [],
+        unresolvedIssues: [],
+        securityWarnings: [],
+        executionTimeMs: Math.round(performance.now() - startTime),
+      },
+    };
+  }
+
+  // Pre-Sanitization & Hardening Pass:
+  // 1. Strip UTF-8 Byte Order Mark (BOM)
+  if (result.charCodeAt(0) === 0xfeff) {
+    result = result.substring(1);
+    fixes.push('Removed UTF-8 Byte Order Mark (BOM)');
+    diffItems.push({
+      code: 'ERR_ENCODING_BOM',
+      category: 'well-formedness',
+      classification: 'safe-automatic',
+      confidence: 'high',
+      description: 'Stripped UTF-8 Byte Order Mark (BOM) from start of document',
+    });
+  }
+
+  // 2. Strip illegal ASCII control characters
+  if (/[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(result)) {
+    result = result.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+    fixes.push('Stripped illegal ASCII control characters');
+    diffItems.push({
+      code: 'ERR_ILLEGAL_CONTROL_CHAR',
+      category: 'well-formedness',
+      classification: 'safe-automatic',
+      confidence: 'high',
+      description: 'Stripped illegal ASCII control characters not permitted in XML 1.0',
+    });
+  }
+
+  // 3. Security Hardening: Comment out unsafe external entities (XXE Defense)
+  const xxeRegex = /<!ENTITY\s+([a-zA-Z0-9_.:-]+)\s+(?:SYSTEM|PUBLIC)\s+["']([^"']*)["']\s*>/gi;
+  if (xxeRegex.test(result)) {
+    result = result.replace(xxeRegex, '<!-- [XXE DEFENSE DISABLED] $& -->');
+    fixes.push('Disabled unsafe external entity declaration to prevent XXE attacks');
+    securityWarnings.push('External entity resolution was disabled to prevent XML External Entity (XXE) attacks');
+    diffItems.push({
+      code: 'ERR_SECURITY_XXE',
+      category: 'security',
+      classification: 'safe-automatic',
+      confidence: 'high',
+      description: 'Commented out external entity declaration to prevent unauthorized resource access',
+    });
+  }
+
+  // 4. Normalize smart / curly quotes BEFORE attribute quoting
+  if (/[\u201C\u201D\u2018\u2019]/.test(result)) {
+    result = result.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+    fixes.push('Normalized smart/curly quotes to standard XML quotes');
+    diffItems.push({
+      code: 'ERR_SMART_QUOTES',
+      category: 'well-formedness',
+      classification: 'safe-automatic',
+      confidence: 'high',
+      description: 'Normalized smart/curly quotes to standard XML quotes',
+    });
+  }
+
+  // 5. Correct invalid comment end delimiter '--->'
+  if (/--->/.test(result)) {
+    result = result.replace(/--->/g, '-->');
+    fixes.push("Corrected invalid comment closing delimiter '--->' to '-->'");
+    diffItems.push({
+      code: 'ERR_COMMENT_INVALID_CLOSE',
+      category: 'well-formedness',
+      classification: 'safe-automatic',
+      confidence: 'high',
+      description: "Corrected comment closing delimiter '--->' to '-->'",
+    });
+  }
+
+  // Run up to 5 iterative passes to resolve cascading dependencies
+  let totalPasses = 0;
+  for (let pass = 0; pass < 5; pass++) {
+    totalPasses++;
     const passFixes: string[] = [];
     const prevResult = result;
 
@@ -1122,7 +1413,15 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
       const unquotedAttrRegex = /(\s+[a-zA-Z_][a-zA-Z0-9_.:-]*\s*=\s*)([^"'\s][\s\S]*?)(?=\s+[a-zA-Z_][a-zA-Z0-9_.:-]*\s*=|\s*\/$|\s*$)/g;
       if (unquotedAttrRegex.test(fixedAttrs)) {
         fixedAttrs = fixedAttrs.replace(unquotedAttrRegex, (_m: string, p1: string, p2: string) => {
-          passFixes.push(`Added quotes to attribute in <${tagName}>: ${p1.trim()}"${p2.trim()}"`);
+          const desc = `Added quotes to attribute in <${tagName}>: ${p1.trim()}"${p2.trim()}"`;
+          passFixes.push(desc);
+          diffItems.push({
+            code: 'ERR_UNQUOTED_ATTR',
+            category: 'well-formedness',
+            classification: 'safe-automatic',
+            confidence: 'high',
+            description: desc,
+          });
           return `${p1}"${p2.trim()}"`;
         });
       }
@@ -1132,7 +1431,15 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
       if (standaloneRegex.test(fixedAttrs)) {
         fixedAttrs = fixedAttrs.replace(standaloneRegex, (m: string, space: string, attrName: string) => {
           if (attrName.startsWith('?') || attrName.endsWith('?')) return m;
-          passFixes.push(`Assigned value to boolean/standalone attribute '${attrName}' in <${tagName}>`);
+          const desc = `Assigned value to boolean/standalone attribute '${attrName}' in <${tagName}>`;
+          passFixes.push(desc);
+          diffItems.push({
+            code: 'ERR_STANDALONE_ATTR',
+            category: 'well-formedness',
+            classification: 'safe-automatic',
+            confidence: 'high',
+            description: desc,
+          });
           return `${space}${attrName}="${attrName}"`;
         });
       }
@@ -1157,11 +1464,27 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
         // First declaration is misplaced inside body, move it to the top
         const withoutFirst = result.substring(0, first.index) + result.substring(first.index + first.length);
         result = `${first.match}\n${withoutFirst.trim()}`;
-        passFixes.push('Moved misplaced <?xml ...?> declaration to the top of the document');
+        const desc = 'Moved misplaced <?xml ...?> declaration to the top of the document';
+        passFixes.push(desc);
+        diffItems.push({
+          code: 'ERR_DECLARATION_MISPLACED',
+          category: 'declaration-error',
+          classification: 'safe-automatic',
+          confidence: 'high',
+          description: desc,
+        });
       } else if (first.index > 0) {
         // Preceded only by whitespace/BOM
         result = result.replace(/^\s+<\?xml/i, '<?xml');
-        passFixes.push('Removed whitespace preceding XML declaration <?xml');
+        const desc = 'Removed whitespace preceding XML declaration <?xml';
+        passFixes.push(desc);
+        diffItems.push({
+          code: 'ERR_DECLARATION_MISPLACED',
+          category: 'declaration-error',
+          classification: 'safe-automatic',
+          confidence: 'high',
+          description: desc,
+        });
       }
 
       // Remove any subsequent/nested <?xml ...?> declarations inside the body
@@ -1175,7 +1498,15 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
             cleanedBody = cleanedBody.replace(/<\?xml\b[^>]*\?>/gi, '');
           }
           result = topPart + cleanedBody;
-          passFixes.push('Removed invalid nested <?xml ...?> declaration from document body');
+          const desc = 'Removed invalid nested <?xml ...?> declaration from document body';
+          passFixes.push(desc);
+          diffItems.push({
+            code: 'ERR_DECLARATION_NESTED',
+            category: 'declaration-error',
+            classification: 'safe-automatic',
+            confidence: 'high',
+            description: desc,
+          });
         }
       }
     }
@@ -1211,7 +1542,15 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
         } else {
           result = stylesheetsToMove.join('\n') + '\n' + result;
         }
-        passFixes.push('Moved <?xml-stylesheet ...?> processing instruction to document prolog');
+        const desc = 'Moved <?xml-stylesheet ...?> processing instruction to document prolog';
+        passFixes.push(desc);
+        diffItems.push({
+          code: 'ERR_PI_MISPLACED',
+          category: 'well-formedness',
+          classification: 'safe-automatic',
+          confidence: 'high',
+          description: desc,
+        });
       }
     }
 
@@ -1220,7 +1559,15 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
     const ampMatches = (result.match(bareAmpRegex) || []).length;
     if (ampMatches > 0) {
       result = result.replace(bareAmpRegex, '&amp;');
-      passFixes.push(`Escaped ${ampMatches} bare ampersand(s) to &amp;`);
+      const desc = `Escaped ${ampMatches} bare ampersand(s) to &amp;`;
+      passFixes.push(desc);
+      diffItems.push({
+        code: 'ERR_UNESCAPED_AMP',
+        category: 'unescaped-character',
+        classification: 'safe-automatic',
+        confidence: 'high',
+        description: desc,
+      });
     }
 
     // 3. Escape bare '<' not starting a valid tag or declaration
@@ -1228,7 +1575,15 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
     const ltMatches = (result.match(bareLtRegex) || []).length;
     if (ltMatches > 0) {
       result = result.replace(bareLtRegex, '&lt;');
-      passFixes.push(`Escaped ${ltMatches} bare '<' symbol(s) to &lt;`);
+      const desc = `Escaped ${ltMatches} bare '<' symbol(s) to &lt;`;
+      passFixes.push(desc);
+      diffItems.push({
+        code: 'ERR_UNESCAPED_LT',
+        category: 'unescaped-character',
+        classification: 'safe-automatic',
+        confidence: 'high',
+        description: desc,
+      });
     }
 
     // 4. Normalize smart / curly quotes
@@ -1236,24 +1591,56 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
       result = result
         .replace(/[\u201C\u201D]/g, '"')
         .replace(/[\u2018\u2019]/g, "'");
-      passFixes.push('Normalized smart/curly quotes to standard XML quotes');
+      const desc = 'Normalized smart/curly quotes to standard XML quotes';
+      passFixes.push(desc);
+      diffItems.push({
+        code: 'ERR_SMART_QUOTES',
+        category: 'well-formedness',
+        classification: 'safe-automatic',
+        confidence: 'high',
+        description: desc,
+      });
     }
 
     // 5. Close unclosed comments or CDATA
     if (result.includes('<!--') && !result.includes('-->')) {
       result = `${result}\n-->`;
-      passFixes.push("Closed unterminated comment with '-->'");
+      const desc = "Closed unterminated comment with '-->'";
+      passFixes.push(desc);
+      diffItems.push({
+        code: 'ERR_COMMENT_UNTERMINATED',
+        category: 'well-formedness',
+        classification: 'safe-automatic',
+        confidence: 'high',
+        description: desc,
+      });
     }
     if (result.includes('<![CDATA[') && !result.includes(']]>')) {
       result = `${result}\n]]>`;
-      passFixes.push("Closed unterminated CDATA with ']]>'");
+      const desc = "Closed unterminated CDATA with ']]>'";
+      passFixes.push(desc);
+      diffItems.push({
+        code: 'ERR_CDATA_UNTERMINATED',
+        category: 'well-formedness',
+        classification: 'safe-automatic',
+        confidence: 'high',
+        description: desc,
+      });
     }
 
     // 5a-1. Fix invalid double-hyphens '--' inside XML comments
     const commentDoubleHyphenRegex = /<!--([\s\S]*?)-->/g;
     result = result.replace(commentDoubleHyphenRegex, (match, body) => {
       if (body.includes('--')) {
-        passFixes.push("Replaced invalid '--' within XML comment with single hyphen '-'");
+        const desc = "Replaced invalid '--' within XML comment with single hyphen '-'";
+        passFixes.push(desc);
+        diffItems.push({
+          code: 'ERR_COMMENT_DOUBLE_HYPHEN',
+          category: 'well-formedness',
+          classification: 'safe-automatic',
+          confidence: 'high',
+          description: desc,
+        });
         const cleanBody = body.replace(/--+/g, '-');
         return `<!--${cleanBody}-->`;
       }
@@ -1264,7 +1651,15 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
     const unclosedEndTagRegex = /<\/([a-zA-Z_][a-zA-Z0-9_.:-]*)[ \t]*(?=\r?\n|[ \t]*<|$)/g;
     if (unclosedEndTagRegex.test(result)) {
       result = result.replace(unclosedEndTagRegex, (_match, tagName) => {
-        passFixes.push(`Closed unclosed end tag </${tagName}> with '>'`);
+        const desc = `Closed unclosed end tag </${tagName}> with '>'`;
+        passFixes.push(desc);
+        diffItems.push({
+          code: 'ERR_END_TAG_BRACKET',
+          category: 'unclosed-tag',
+          classification: 'safe-automatic',
+          confidence: 'high',
+          description: desc,
+        });
         return `</${tagName}>`;
       });
     }
@@ -1294,7 +1689,15 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
           result = result.replace(prefixedRegex, (_m, p1, _prefix, local, p4) => {
             return `${p1}${local}${p4}`;
           });
-          passFixes.push(`Removed undeclared namespace prefix from <${declaredElem}> elements to match DTD declaration`);
+          const desc = `Removed undeclared namespace prefix from <${declaredElem}> elements to match DTD declaration`;
+          passFixes.push(desc);
+          diffItems.push({
+            code: 'ERR_DTD_NAMESPACE_PREFIX',
+            category: 'namespace',
+            classification: 'safe-automatic',
+            confidence: 'high',
+            description: desc,
+          });
         }
       }
 
@@ -1306,7 +1709,15 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
             if (enumAttrRegex.test(result)) {
               result = result.replace(enumAttrRegex, (full, p1, val, p3) => {
                 if (!decl.allowedValues!.includes(val)) {
-                  passFixes.push(`Corrected invalid enumerated value '${val}' for attribute '${attrName}' to '${decl.defaultValue}'`);
+                  const desc = `Corrected invalid enumerated value '${val}' for attribute '${attrName}' to '${decl.defaultValue}'`;
+                  passFixes.push(desc);
+                  diffItems.push({
+                    code: 'ERR_DTD_ENUM_VALUE',
+                    category: 'dtd',
+                    classification: 'confirmation-required',
+                    confidence: 'medium',
+                    description: desc,
+                  });
                   return `${p1}${decl.defaultValue}${p3}`;
                 }
                 return full;
@@ -1349,7 +1760,15 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
           const rootDeclRegex = new RegExp(`(<!ELEMENT\\s+${dtd.rootName}\\s*\\([^)]+)\\)>`, 'i');
           if (rootDeclRegex.test(result)) {
             result = result.replace(rootDeclRegex, `$1, ${tag}?)>\n    <!ELEMENT ${tag} (#PCDATA)>`);
-            passFixes.push(`Preserved <${tag}> data element and extended DTD content model for <${dtd.rootName}>`);
+            const desc = `Preserved <${tag}> data element and extended DTD content model for <${dtd.rootName}>`;
+            passFixes.push(desc);
+            diffItems.push({
+              code: 'ERR_DTD_ELEMENT_UNDECLARED',
+              category: 'dtd',
+              classification: 'confirmation-required',
+              confidence: 'medium',
+              description: desc,
+            });
             dtd = parseDtd(result); // refresh DTD with the newly declared element
           }
         } else {
@@ -1364,7 +1783,15 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
             const inlineRegex = new RegExp(`<${tag}(\\s[^>]*)?>[\\s\\S]*?<\\/${tag}>\\s*`, 'gi');
             result = result.replace(inlineRegex, '');
           }
-          passFixes.push(`Removed unexpected element <${tag}> not declared in DTD`);
+          const desc = `Removed unexpected element <${tag}> not declared in DTD`;
+          passFixes.push(desc);
+          diffItems.push({
+            code: 'ERR_DTD_ELEMENT_UNEXPECTED',
+            category: 'dtd',
+            classification: 'safe-automatic',
+            confidence: 'medium',
+            description: desc,
+          });
         }
       }
 
@@ -1396,7 +1823,15 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
                   const existingAttlistRegex = new RegExp(`<!ATTLIST\\s+${elemName}\\s+${attrName}\\b`, 'i');
                   if (!existingAttlistRegex.test(result)) {
                     result = result.replace(elemDefRegex, `$1\n    <!ATTLIST ${elemName} ${attrName} CDATA #IMPLIED>`);
-                    passFixes.push(`Declared missing attribute '${attrName}' for <${elemName}> in DTD (<!ATTLIST ${elemName} ${attrName} CDATA #IMPLIED>)`);
+                    const desc = `Declared missing attribute '${attrName}' for <${elemName}> in DTD (<!ATTLIST ${elemName} ${attrName} CDATA #IMPLIED>)`;
+                    passFixes.push(desc);
+                    diffItems.push({
+                      code: 'ERR_DTD_ATTR_UNDECLARED',
+                      category: 'dtd',
+                      classification: 'safe-automatic',
+                      confidence: 'high',
+                      description: desc,
+                    });
                     dtd = parseDtd(result);
                   }
                 }
@@ -1449,7 +1884,15 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
           } while (allIds.includes(newId) || seenIdsForFix.has(newId));
         }
         seenIdsForFix.add(newId);
-        passFixes.push(`Changed duplicate ID '${val}' to unique identifier '${newId}'`);
+        const desc = `Changed duplicate ID '${val}' to unique identifier '${newId}'`;
+        passFixes.push(desc);
+        diffItems.push({
+          code: 'ERR_DUPLICATE_ID',
+          category: 'dtd',
+          classification: 'confirmation-required',
+          confidence: 'medium',
+          description: desc,
+        });
         return `${p1}${newId}${p3}`;
       } else {
         seenIdsForFix.add(val);
@@ -1471,7 +1914,15 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
       } else {
         result = `<root>\n${result}\n</root>`;
       }
-      passFixes.push('Enclosed multiple root elements in a <root>...</root> wrapper');
+      const desc = 'Enclosed multiple root elements in a <root>...</root> wrapper';
+      passFixes.push(desc);
+      diffItems.push({
+        code: 'ERR_MULTIPLE_ROOTS',
+        category: 'multiple-roots',
+        classification: 'confirmation-required',
+        confidence: 'high',
+        description: desc,
+      });
       for (const f of passFixes) {
         if (!fixes.includes(f)) fixes.push(f);
       }
@@ -1498,7 +1949,16 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
           if (lineIdx >= 0 && lineIdx < lines.length && targetRegex.test(lines[lineIdx])) {
             lines[lineIdx] = lines[lineIdx].replace(targetRegex, `</${expectedTag}>`);
             linesModified = true;
-            passFixes.push(`Line ${err.line}: Corrected </${actualTag}> to </${expectedTag}>`);
+            const desc = `Line ${err.line}: Corrected </${actualTag}> to </${expectedTag}>`;
+            passFixes.push(desc);
+            diffItems.push({
+              code: 'ERR_TAG_MISMATCH',
+              category: 'tag-mismatch',
+              classification: 'safe-automatic',
+              confidence: 'high',
+              description: `Corrected </${actualTag}> to </${expectedTag}>`,
+              line: err.line,
+            });
           } else {
             // Check adjacent lines in case of wrapping
             let fixedNearby = false;
@@ -1507,7 +1967,16 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
               if (checkIdx >= 0 && checkIdx < lines.length && targetRegex.test(lines[checkIdx])) {
                 lines[checkIdx] = lines[checkIdx].replace(targetRegex, `</${expectedTag}>`);
                 linesModified = true;
-                passFixes.push(`Line ${checkIdx + 1}: Corrected </${actualTag}> to </${expectedTag}>`);
+                const desc = `Line ${checkIdx + 1}: Corrected </${actualTag}> to </${expectedTag}>`;
+                passFixes.push(desc);
+                diffItems.push({
+                  code: 'ERR_TAG_MISMATCH',
+                  category: 'tag-mismatch',
+                  classification: 'safe-automatic',
+                  confidence: 'high',
+                  description: `Corrected </${actualTag}> to </${expectedTag}>`,
+                  line: checkIdx + 1,
+                });
                 fixedNearby = true;
                 break;
               }
@@ -1518,7 +1987,15 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
                 result = joined.replace(targetRegex, `</${expectedTag}>`);
                 lines.splice(0, lines.length, ...result.split(/\r?\n/));
                 linesModified = true;
-                passFixes.push(`Corrected closing tag </${actualTag}> to </${expectedTag}>`);
+                const desc = `Corrected closing tag </${actualTag}> to </${expectedTag}>`;
+                passFixes.push(desc);
+                diffItems.push({
+                  code: 'ERR_TAG_MISMATCH',
+                  category: 'tag-mismatch',
+                  classification: 'safe-automatic',
+                  confidence: 'high',
+                  description: desc,
+                });
               }
             }
           }
@@ -1540,7 +2017,16 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
           if (leafRegex.test(lines[lineIdx]) && !lines[lineIdx].includes(`</${unclosedTag}>`)) {
             lines[lineIdx] = lines[lineIdx].trimEnd() + `</${unclosedTag}>`;
             linesModified = true;
-            passFixes.push(`Line ${targetLine}: Closed unclosed leaf element <${unclosedTag}> with </${unclosedTag}>`);
+            const desc = `Line ${targetLine}: Closed unclosed leaf element <${unclosedTag}> with </${unclosedTag}>`;
+            passFixes.push(desc);
+            diffItems.push({
+              code: 'ERR_UNCLOSED_TAG',
+              category: 'unclosed-tag',
+              classification: 'safe-automatic',
+              confidence: 'high',
+              description: `Closed unclosed leaf element <${unclosedTag}> with </${unclosedTag}>`,
+              line: targetLine,
+            });
           } else if (matchBefore) {
             const nextTag = matchBefore[1];
             const targetNextRegex = new RegExp(`(</\\s*${nextTag}\\s*>)`, 'i');
@@ -1549,7 +2035,16 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
                 const indent = lines[k].match(/^(\s*)/)?.[1] || '';
                 lines[k] = lines[k].replace(targetNextRegex, `${indent}</${unclosedTag}>\n$1`);
                 linesModified = true;
-                passFixes.push(`Line ${k + 1}: Inserted missing closing tag </${unclosedTag}> before </${nextTag}>`);
+                const desc = `Line ${k + 1}: Inserted missing closing tag </${unclosedTag}> before </${nextTag}>`;
+                passFixes.push(desc);
+                diffItems.push({
+                  code: 'ERR_UNCLOSED_TAG',
+                  category: 'unclosed-tag',
+                  classification: 'safe-automatic',
+                  confidence: 'high',
+                  description: `Inserted missing closing tag </${unclosedTag}> before </${nextTag}>`,
+                  line: k + 1,
+                });
                 break;
               }
             }
@@ -1557,7 +2052,15 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
             // Premature end of document or no next tag: append before root close or end
             lines.push(`</${unclosedTag}>`);
             linesModified = true;
-            passFixes.push(`Appended missing closing tag </${unclosedTag}>`);
+            const desc = `Appended missing closing tag </${unclosedTag}>`;
+            passFixes.push(desc);
+            diffItems.push({
+              code: 'ERR_UNCLOSED_TAG',
+              category: 'unclosed-tag',
+              classification: 'safe-automatic',
+              confidence: 'high',
+              description: desc,
+            });
           }
         }
       }
@@ -1575,7 +2078,16 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
             if (dupAttrRegex.test(lines[lineIdx])) {
               lines[lineIdx] = lines[lineIdx].replace(dupAttrRegex, '$1$2');
               linesModified = true;
-              passFixes.push(`Line ${err.line}: Removed duplicate attribute '${attrName}'`);
+              const desc = `Line ${err.line}: Removed duplicate attribute '${attrName}'`;
+              passFixes.push(desc);
+              diffItems.push({
+                code: 'ERR_DUPLICATE_ATTR',
+                category: 'duplicate-attribute',
+                classification: 'safe-automatic',
+                confidence: 'high',
+                description: `Removed duplicate attribute '${attrName}'`,
+                line: err.line,
+              });
             }
           }
         }
@@ -1600,7 +2112,16 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
                 lines[lineIdx] = lines[lineIdx].replace(strayRegex, '');
               }
               linesModified = true;
-              passFixes.push(`Line ${err.line}: Removed stray closing tag </${strayTag}>`);
+              const desc = `Line ${err.line}: Removed stray closing tag </${strayTag}>`;
+              passFixes.push(desc);
+              diffItems.push({
+                code: 'ERR_STRAY_CLOSING_TAG',
+                category: 'tag-mismatch',
+                classification: 'safe-automatic',
+                confidence: 'high',
+                description: `Removed stray closing tag </${strayTag}>`,
+                line: err.line,
+              });
             }
           }
         }
@@ -1627,7 +2148,48 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
     }
   }
 
-  return { fixedXml: result, fixes };
+  // Final revalidation and reporting
+  const finalDiag = validateXmlStructure(result);
+  const remainingErrors = scanXmlErrors(result);
+
+  for (const err of remainingErrors) {
+    if (err.category === 'security' && !securityWarnings.includes(err.message)) {
+      securityWarnings.push(err.message);
+    }
+  }
+
+  // Deduplicate diffItems
+  const uniqueDiffItems: AutoFixDiffItem[] = [];
+  const seenDiffKeys = new Set<string>();
+  for (const item of diffItems) {
+    const key = `${item.code}::${item.description}`;
+    if (!seenDiffKeys.has(key)) {
+      seenDiffKeys.add(key);
+      uniqueDiffItems.push(item);
+    }
+  }
+
+  const unresolvedIssues: XmlValidationError[] = [
+    ...finalDiag.errors,
+    ...remainingErrors.filter((re) => !finalDiag.errors.some((fe) => fe.message === re.message)),
+  ];
+
+  const finalValid =
+    finalDiag.isValid && remainingErrors.filter((e) => e.category !== 'security').length === 0;
+
+  return {
+    fixedXml: result,
+    fixes: Array.from(new Set(fixes)),
+    report: {
+      originalValid,
+      finalValid,
+      totalPasses,
+      fixes: uniqueDiffItems,
+      unresolvedIssues,
+      securityWarnings,
+      executionTimeMs: Math.round(performance.now() - startTime),
+    },
+  };
 }
 
 /**

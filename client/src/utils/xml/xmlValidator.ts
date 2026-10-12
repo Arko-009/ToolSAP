@@ -375,6 +375,18 @@ export function scanXmlErrors(xml: string): XmlValidationError[] {
         });
         break;
       }
+      const commentBody = xml.substring(i + 4, endComment);
+      if (commentBody.includes('--')) {
+        const loc = offsetToLineCol(xml, i);
+        errors.push({
+          message: `The string '--' is not permitted inside an XML comment on line ${loc.line}.`,
+          line: loc.line,
+          column: loc.column,
+          snippet: generateSnippet(xml, loc.line, loc.column),
+          category: 'syntax-error',
+          suggestion: "In XML, comments must not contain double hyphens '--'. Replace '--' with a single '-' or text.",
+        });
+      }
       i = endComment + 3;
       continue;
     }
@@ -462,6 +474,28 @@ export function scanXmlErrors(xml: string): XmlValidationError[] {
     if (xml.startsWith('</', i)) {
       const closeBracket = xml.indexOf('>', i + 2);
       const loc = offsetToLineCol(xml, i);
+
+      // Check if closing tag is missing '>' before newline, next tag, or EOF
+      const tagSlice = xml.substring(i + 2);
+      const unclosedMatch = tagSlice.match(/^([a-zA-Z_][a-zA-Z0-9_.:-]*)[ \t]*(?=\r?\n|[ \t]*<|$)/);
+      if (unclosedMatch && (closeBracket === -1 || closeBracket > i + 2 + unclosedMatch[0].length)) {
+        const tagName = unclosedMatch[1];
+        errors.push({
+          message: `Closing tag '</${tagName}' on line ${loc.line} is missing closing bracket '>'.`,
+          line: loc.line,
+          column: loc.column,
+          snippet: generateSnippet(xml, loc.line, loc.column),
+          category: 'syntax-error',
+          suggestion: `Close the tag with '>': </${tagName}>.`,
+        });
+        if (stack.length > 0 && stack[stack.length - 1].name === tagName) {
+          stack.pop();
+          if (stack.length === 0) rootClosed = true;
+        }
+        i += 2 + unclosedMatch[0].length;
+        continue;
+      }
+
       if (closeBracket === -1) {
         errors.push({
           message: `Unclosed end tag bracket on line ${loc.line}`,
@@ -1214,6 +1248,41 @@ export function autoFixXml(xml: string): { fixedXml: string; fixes: string[] } {
       result = `${result}\n]]>`;
       passFixes.push("Closed unterminated CDATA with ']]>'");
     }
+
+    // 5a-1. Fix invalid double-hyphens '--' inside XML comments
+    const commentDoubleHyphenRegex = /<!--([\s\S]*?)-->/g;
+    result = result.replace(commentDoubleHyphenRegex, (match, body) => {
+      if (body.includes('--')) {
+        passFixes.push("Replaced invalid '--' within XML comment with single hyphen '-'");
+        const cleanBody = body.replace(/--+/g, '-');
+        return `<!--${cleanBody}-->`;
+      }
+      return match;
+    });
+
+    // 5a-2. Fix closing tags missing '>' before newline or subsequent tag (e.g. </email\n)
+    const unclosedEndTagRegex = /<\/([a-zA-Z_][a-zA-Z0-9_.:-]*)[ \t]*(?=\r?\n|[ \t]*<|$)/g;
+    if (unclosedEndTagRegex.test(result)) {
+      result = result.replace(unclosedEndTagRegex, (_match, tagName) => {
+        passFixes.push(`Closed unclosed end tag </${tagName}> with '>'`);
+        return `</${tagName}>`;
+      });
+    }
+
+    // 5a-3. Fix unquoted attribute values on start tags (e.g. id=E103 or state=West Bengal)
+    const openTagUnquotedRegex = /<([a-zA-Z_][a-zA-Z0-9_.:-]*)(\s+[^>]*)>/g;
+    result = result.replace(openTagUnquotedRegex, (fullTag, tagName, attrs) => {
+      const unquotedAttrRegex = /(\s+[a-zA-Z_][a-zA-Z0-9_.:-]*\s*=\s*)([^"'\s][\s\S]*?)(?=\s+[a-zA-Z_][a-zA-Z0-9_.:-]*\s*=|\s*\/$|\s*$)/g;
+      if (unquotedAttrRegex.test(attrs)) {
+        const fixedAttrs = attrs.replace(unquotedAttrRegex, (_m, p1, val) => {
+          const trimmedVal = val.trim();
+          passFixes.push(`Enclosed unquoted attribute value in double quotes: ${p1.trim()}"${trimmedVal}"`);
+          return `${p1}"${trimmedVal}"`;
+        });
+        return `<${tagName}${fixedAttrs}>`;
+      }
+      return fullTag;
+    });
 
     // 5b. DTD Namespace Prefix Alignment, Enumerated Attributes & Smart Element Conformity
     let dtd = parseDtd(result);

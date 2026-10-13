@@ -65,6 +65,7 @@ export interface XmlValidationError {
   suggestion?: string;
   code?: string;
   classification?: RepairClassification;
+  source?: 'xml' | 'xsd';
 }
 
 export interface XmlNamespaceInfo {
@@ -1687,7 +1688,7 @@ export function autoFixXml(xml: string): AutoFixResult {
     result = result.replace(openTagUnquotedRegex, (fullTag, tagName, attrs) => {
       const unquotedAttrRegex = /(\s+[a-zA-Z_][a-zA-Z0-9_.:-]*\s*=\s*)([^"'\s][\s\S]*?)(?=\s+[a-zA-Z_][a-zA-Z0-9_.:-]*\s*=|\s*\/$|\s*$)/g;
       if (unquotedAttrRegex.test(attrs)) {
-        const fixedAttrs = attrs.replace(unquotedAttrRegex, (_m, p1, val) => {
+        const fixedAttrs = attrs.replace(unquotedAttrRegex, (_m: string, p1: string, val: string) => {
           const trimmedVal = val.trim();
           passFixes.push(`Enclosed unquoted attribute value in double quotes: ${p1.trim()}"${trimmedVal}"`);
           return `${p1}"${trimmedVal}"`;
@@ -1746,6 +1747,7 @@ export function autoFixXml(xml: string): AutoFixResult {
       }
 
       // 5b-3. Handle unexpected / undeclared elements: preserve intended data (with DTD extension) or remove unexpected elements
+      if (!dtd) continue; // safety: dtd may have been nullified by parseDtd refresh
       const allDeclared = new Set(dtd.elements.keys());
       allDeclared.add(dtd.rootName);
 
@@ -1766,7 +1768,7 @@ export function autoFixXml(xml: string): AutoFixResult {
 
         // Check if content references a declared DTD entity (like &offer;)
         let referencesDtdEntity = false;
-        for (const [entName] of dtd.entities) {
+        for (const [entName] of (dtd?.entities ?? new Map())) {
           if (tagContent.includes(`&${entName};`)) {
             referencesDtdEntity = true;
             break;
@@ -1775,10 +1777,11 @@ export function autoFixXml(xml: string): AutoFixResult {
 
         if (referencesDtdEntity) {
           // Preserve intended data element by extending DTD root content model and declaring element
-          const rootDeclRegex = new RegExp(`(<!ELEMENT\\s+${dtd.rootName}\\s*\\([^)]+)\\)>`, 'i');
+          const currentRootName = dtd?.rootName ?? 'root';
+          const rootDeclRegex = new RegExp(`(<!ELEMENT\\s+${currentRootName}\\s*\\([^)]+)\\)>`, 'i');
           if (rootDeclRegex.test(result)) {
             result = result.replace(rootDeclRegex, `$1, ${tag}?)>\n    <!ELEMENT ${tag} (#PCDATA)>`);
-            const desc = `Preserved <${tag}> data element and extended DTD content model for <${dtd.rootName}>`;
+            const desc = `Preserved <${tag}> data element and extended DTD content model for <${currentRootName}>`;
             passFixes.push(desc);
             diffItems.push({
               code: 'ERR_DTD_ELEMENT_UNDECLARED',
@@ -1814,6 +1817,7 @@ export function autoFixXml(xml: string): AutoFixResult {
       }
 
       // 5b-4. Declare missing attributes for elements in DTD (e.g. <!ATTLIST price currency CDATA #IMPLIED>)
+      if (!dtd) continue; // safety: dtd may have been nullified by parseDtd refresh
       for (const [elemName] of dtd.elements) {
         const elemTagRegex = new RegExp(`<${elemName}\\b([^>]*)>`, 'gi');
         let em: RegExpExecArray | null;
@@ -1825,11 +1829,11 @@ export function autoFixXml(xml: string): AutoFixResult {
             const attrVal = am[2] ?? am[3] ?? '';
             if (attrName.startsWith('xmlns')) continue;
 
-            const elemDecl = dtd.attributes.get(elemName);
+            const elemDecl = dtd?.attributes.get(elemName);
             const isDeclared = elemDecl && elemDecl.has(attrName);
             if (!isDeclared) {
               let shouldDeclare = false;
-              for (const [entName] of dtd.entities) {
+              for (const [entName] of (dtd?.entities ?? new Map())) {
                 if (attrVal.includes(`&${entName};`)) {
                   shouldDeclare = true;
                   break;
@@ -2210,49 +2214,759 @@ export function autoFixXml(xml: string): AutoFixResult {
   };
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// XSD Schema Compilation and Instance Validation Engine
+// Comprehensive client-side schema validation with support for:
+//   • ComplexType / SimpleType resolution and named type lookup
+//   • Compositor validation: xs:sequence, xs:choice, xs:all
+//   • Cardinality enforcement: minOccurs / maxOccurs
+//   • Attribute validation: use="required" / "optional" / "prohibited"
+//   • Simple type facets: pattern, enumeration, minLength, maxLength,
+//     minInclusive, maxInclusive, minExclusive, maxExclusive, totalDigits,
+//     fractionDigits
+//   • Namespace-aware element matching (elementFormDefault)
+//   • Identity constraints: xs:unique, xs:key, xs:keyref
+//   • Detailed error classification with actionable suggestions
+// ──────────────────────────────────────────────────────────────────────────────
+
+/** Internal representation of an XSD simple type */
+interface XsdSimpleTypeDef {
+  kind: 'simple';
+  name: string;
+  baseType: string;
+  facets: {
+    pattern?: string;
+    enumeration?: string[];
+    minLength?: number;
+    maxLength?: number;
+    minInclusive?: number;
+    maxInclusive?: number;
+    minExclusive?: number;
+    maxExclusive?: number;
+    totalDigits?: number;
+    fractionDigits?: number;
+  };
+}
+
+/** Internal representation of a child element declaration inside a compositor */
+interface XsdElementDecl {
+  name: string;
+  type: string;
+  minOccurs: number;
+  maxOccurs: number; // -1 = unbounded
+  isRef: boolean;
+  ref?: string;
+  prefix?: string;
+  namespaceURI?: string;
+  nillable?: boolean;
+  isAny?: boolean;
+  anyNamespace?: string;
+  processContents?: string;
+}
+
+/** Internal representation of an attribute declaration */
+interface XsdAttributeDecl {
+  name: string;
+  type: string;
+  use: 'required' | 'optional' | 'prohibited';
+  isRef?: boolean;
+  ref?: string;
+  prefix?: string;
+  namespaceURI?: string;
+  defaultValue?: string;
+  fixedValue?: string;
+  isAny?: boolean;
+  anyNamespace?: string;
+  processContents?: string;
+}
+
+/** Internal representation of a compositor (sequence / choice / all) */
+interface XsdCompositor {
+  kind: 'sequence' | 'choice' | 'all';
+  elements: XsdElementDecl[];
+  minOccurs: number;
+  maxOccurs: number;
+}
+
+/** Internal representation of an XSD complex type */
+interface XsdComplexTypeDef {
+  kind: 'complex';
+  name: string;
+  compositor: XsdCompositor | null;
+  attributes: XsdAttributeDecl[];
+  mixed: boolean;
+}
+
+type XsdTypeDef = XsdSimpleTypeDef | XsdComplexTypeDef;
+
+/** Identity constraint parsed from XSD */
+interface XsdIdentityConstraint {
+  kind: 'unique' | 'key' | 'keyref';
+  name: string;
+  selector: string;
+  fields: string[];
+  refer?: string; // for keyref
+}
+
+/** Compiled XSD schema ready for validation */
+interface CompiledXsdSchema {
+  targetNamespace: string;
+  elementFormDefault: 'qualified' | 'unqualified';
+  types: Map<string, XsdTypeDef>;
+  topElements: Map<string, { type: string; elementDecl: Element }>;
+  identityConstraints: XsdIdentityConstraint[];
+  imports?: Map<string, string>;
+  namespaces?: Map<string, string>;
+}
+
+/** Helper: get local name from a potentially prefixed name */
+function localName(name: string): string {
+  const idx = name.indexOf(':');
+  return idx >= 0 ? name.substring(idx + 1) : name;
+}
+
+/** Helper: resolve a type reference like 'xs:string' to a canonical form */
+function resolveTypeRef(typeRef: string): string {
+  return localName(typeRef);
+}
+
+/** Helper: find the closest ancestor element matching a local name in XSD namespace */
+function closestXsdAncestor(el: Element, tagLocalName: string): Element | null {
+  let current: Element | null = el.parentElement;
+  while (current) {
+    if (localName(current.nodeName) === tagLocalName) return current;
+    current = current.parentElement;
+  }
+  return null;
+}
+
+/** Helper: get child elements of a specific XSD local name */
+function xsdChildren(parent: Element, childLocalName: string): Element[] {
+  return Array.from(parent.children).filter(
+    (c) => localName(c.nodeName) === childLocalName
+  );
+}
+
+/** Helper: get first child element of a specific XSD local name */
+function xsdChild(parent: Element, childLocalName: string): Element | null {
+  return xsdChildren(parent, childLocalName)[0] ?? null;
+}
+
+/** Parse a single simpleType element from XSD */
+function parseSimpleType(el: Element, name: string): XsdSimpleTypeDef {
+  const facets: XsdSimpleTypeDef['facets'] = {};
+  let baseType = 'string';
+
+  const restriction = xsdChild(el, 'restriction');
+  if (restriction) {
+    baseType = resolveTypeRef(restriction.getAttribute('base') || 'string');
+
+    const patternEl = xsdChild(restriction, 'pattern');
+    if (patternEl) facets.pattern = patternEl.getAttribute('value') ?? undefined;
+
+    const enums = xsdChildren(restriction, 'enumeration');
+    if (enums.length > 0) {
+      facets.enumeration = enums.map((e) => e.getAttribute('value') || '');
+    }
+
+    const minLen = xsdChild(restriction, 'minLength');
+    if (minLen) facets.minLength = parseInt(minLen.getAttribute('value') || '0', 10);
+
+    const maxLen = xsdChild(restriction, 'maxLength');
+    if (maxLen) facets.maxLength = parseInt(maxLen.getAttribute('value') || '0', 10);
+
+    const minInc = xsdChild(restriction, 'minInclusive');
+    if (minInc) facets.minInclusive = parseFloat(minInc.getAttribute('value') || '0');
+
+    const maxInc = xsdChild(restriction, 'maxInclusive');
+    if (maxInc) facets.maxInclusive = parseFloat(maxInc.getAttribute('value') || '0');
+
+    const minExc = xsdChild(restriction, 'minExclusive');
+    if (minExc) facets.minExclusive = parseFloat(minExc.getAttribute('value') || '0');
+
+    const maxExc = xsdChild(restriction, 'maxExclusive');
+    if (maxExc) facets.maxExclusive = parseFloat(maxExc.getAttribute('value') || '0');
+
+    const totalD = xsdChild(restriction, 'totalDigits');
+    if (totalD) facets.totalDigits = parseInt(totalD.getAttribute('value') || '0', 10);
+
+    const fracD = xsdChild(restriction, 'fractionDigits');
+    if (fracD) facets.fractionDigits = parseInt(fracD.getAttribute('value') || '0', 10);
+  }
+
+  return { kind: 'simple', name, baseType, facets };
+}
+
+/** Parse elements from a compositor (sequence/choice/all) */
+function parseCompositorElements(compositorEl: Element, docNsMap?: Map<string, string>): XsdElementDecl[] {
+  const elements: XsdElementDecl[] = [];
+  for (const child of Array.from(compositorEl.children)) {
+    const childLocal = localName(child.nodeName);
+    if (childLocal === 'element') {
+      const ref = child.getAttribute('ref') || '';
+      const rawName = child.getAttribute('name') || (ref ? localName(ref) : '');
+      const prefix = ref && ref.includes(':') ? ref.split(':')[0] : undefined;
+      const ns = prefix ? (docNsMap?.get(prefix) || undefined) : undefined;
+      const eType = resolveTypeRef(child.getAttribute('type') || '');
+      const minO = parseInt(child.getAttribute('minOccurs') ?? '1', 10);
+      const maxOStr = child.getAttribute('maxOccurs') ?? '1';
+      const maxO = maxOStr === 'unbounded' ? -1 : parseInt(maxOStr, 10);
+      elements.push({
+        name: rawName,
+        type: eType,
+        minOccurs: minO,
+        maxOccurs: maxO,
+        isRef: !!ref,
+        ref: ref || undefined,
+        prefix,
+        namespaceURI: ns,
+        nillable: child.getAttribute('nillable') === 'true',
+      });
+    } else if (childLocal === 'any') {
+      const anyNs = child.getAttribute('namespace') || '##any';
+      const pc = child.getAttribute('processContents') || 'strict';
+      const minO = parseInt(child.getAttribute('minOccurs') ?? '1', 10);
+      const maxOStr = child.getAttribute('maxOccurs') ?? '1';
+      const maxO = maxOStr === 'unbounded' ? -1 : parseInt(maxOStr, 10);
+      elements.push({
+        name: '*',
+        type: '',
+        minOccurs: minO,
+        maxOccurs: maxO,
+        isRef: false,
+        isAny: true,
+        anyNamespace: anyNs,
+        processContents: pc,
+      });
+    } else if (childLocal === 'sequence' || childLocal === 'choice' || childLocal === 'all') {
+      // Nested compositor: flatten elements for validation
+      elements.push(...parseCompositorElements(child, docNsMap));
+    }
+  }
+  return elements;
+}
+
+/** Parse a complexType element from XSD */
+function parseComplexType(el: Element, name: string, docNsMap?: Map<string, string>): XsdComplexTypeDef {
+  const mixed = el.getAttribute('mixed') === 'true';
+  const attributes: XsdAttributeDecl[] = [];
+  let compositor: XsdCompositor | null = null;
+
+  // Parse compositor
+  for (const compName of ['sequence', 'choice', 'all'] as const) {
+    const compEl = xsdChild(el, compName);
+    if (compEl) {
+      const minO = parseInt(compEl.getAttribute('minOccurs') ?? '1', 10);
+      const maxOStr = compEl.getAttribute('maxOccurs') ?? '1';
+      const maxO = maxOStr === 'unbounded' ? -1 : parseInt(maxOStr, 10);
+      compositor = {
+        kind: compName,
+        elements: parseCompositorElements(compEl, docNsMap),
+        minOccurs: minO,
+        maxOccurs: maxO,
+      };
+      break;
+    }
+  }
+
+  // Parse attributes
+  for (const attrEl of xsdChildren(el, 'attribute')) {
+    const aRef = attrEl.getAttribute('ref') || '';
+    const aName = attrEl.getAttribute('name') || (aRef ? localName(aRef) : '');
+    const aPrefix = aRef && aRef.includes(':') ? aRef.split(':')[0] : undefined;
+    const aNs = aPrefix ? (docNsMap?.get(aPrefix) || undefined) : undefined;
+    const aType = resolveTypeRef(attrEl.getAttribute('type') || 'string');
+    const useStr = attrEl.getAttribute('use') || 'optional';
+    const use = useStr === 'required' ? 'required' : useStr === 'prohibited' ? 'prohibited' : 'optional';
+    attributes.push({
+      name: aName,
+      type: aType,
+      use,
+      isRef: !!aRef,
+      ref: aRef || undefined,
+      prefix: aPrefix,
+      namespaceURI: aNs,
+      defaultValue: attrEl.getAttribute('default') ?? undefined,
+      fixedValue: attrEl.getAttribute('fixed') ?? undefined,
+    });
+  }
+
+  // Parse anyAttribute
+  for (const anyAttrEl of xsdChildren(el, 'anyAttribute')) {
+    const anyNs = anyAttrEl.getAttribute('namespace') || '##any';
+    const pc = anyAttrEl.getAttribute('processContents') || 'strict';
+    attributes.push({
+      name: '*',
+      type: 'string',
+      use: 'optional',
+      isAny: true,
+      anyNamespace: anyNs,
+      processContents: pc,
+    });
+  }
+
+  // If element has inline complexType with elements, handle nested complexTypes
+  // by recursively finding compositors in nested complex type declarations
+  if (!compositor) {
+    const complexContent = xsdChild(el, 'complexContent') || xsdChild(el, 'simpleContent');
+    if (complexContent) {
+      const extension = xsdChild(complexContent, 'extension') || xsdChild(complexContent, 'restriction');
+      if (extension) {
+        for (const compName of ['sequence', 'choice', 'all'] as const) {
+          const compEl = xsdChild(extension, compName);
+          if (compEl) {
+            compositor = {
+              kind: compName,
+              elements: parseCompositorElements(compEl, docNsMap),
+              minOccurs: 1,
+              maxOccurs: 1,
+            };
+            break;
+          }
+        }
+        for (const attrEl of xsdChildren(extension, 'attribute')) {
+          const aRef = attrEl.getAttribute('ref') || '';
+          const aName = attrEl.getAttribute('name') || (aRef ? localName(aRef) : '');
+          const aPrefix = aRef && aRef.includes(':') ? aRef.split(':')[0] : undefined;
+          const aNs = aPrefix ? (docNsMap?.get(aPrefix) || undefined) : undefined;
+          const aType = resolveTypeRef(attrEl.getAttribute('type') || 'string');
+          const useStr = attrEl.getAttribute('use') || 'optional';
+          const use = useStr === 'required' ? 'required' : useStr === 'prohibited' ? 'prohibited' : 'optional';
+          attributes.push({
+            name: aName,
+            type: aType,
+            use,
+            isRef: !!aRef,
+            ref: aRef || undefined,
+            prefix: aPrefix,
+            namespaceURI: aNs,
+            defaultValue: attrEl.getAttribute('default') ?? undefined,
+            fixedValue: attrEl.getAttribute('fixed') ?? undefined,
+          });
+        }
+        for (const anyAttrEl of xsdChildren(extension, 'anyAttribute')) {
+          const anyNs = anyAttrEl.getAttribute('namespace') || '##any';
+          const pc = anyAttrEl.getAttribute('processContents') || 'strict';
+          attributes.push({
+            name: '*',
+            type: 'string',
+            use: 'optional',
+            isAny: true,
+            anyNamespace: anyNs,
+            processContents: pc,
+          });
+        }
+      }
+    }
+  }
+
+  return { kind: 'complex', name, compositor, attributes, mixed };
+}
+
+/** Parse identity constraints (unique, key, keyref) from an element declaration */
+function parseIdentityConstraints(el: Element): XsdIdentityConstraint[] {
+  const constraints: XsdIdentityConstraint[] = [];
+  for (const kind of ['unique', 'key', 'keyref'] as const) {
+    for (const constraintEl of xsdChildren(el, kind)) {
+      const cName = constraintEl.getAttribute('name') || '';
+      const selectorEl = xsdChild(constraintEl, 'selector');
+      const selector = selectorEl?.getAttribute('xpath') || '';
+      const fields = xsdChildren(constraintEl, 'field').map(
+        (f) => f.getAttribute('xpath') || ''
+      );
+      const refer = kind === 'keyref' ? constraintEl.getAttribute('refer') || '' : undefined;
+      constraints.push({ kind, name: cName, selector, fields, refer });
+    }
+  }
+  return constraints;
+}
+
+/** Compile an XSD document into internal schema representation */
+function compileXsdSchema(xsdDoc: Document, additionalDocs: Document[] = []): CompiledXsdSchema | { error: string } {
+  const xsdRoot = xsdDoc.documentElement;
+  if (!xsdRoot || !localName(xsdRoot.nodeName).includes('schema')) {
+    return { error: 'Root element of schema must be <xs:schema> or <xsd:schema>.' };
+  }
+
+  const targetNamespace = xsdRoot.getAttribute('targetNamespace') || '';
+  const efDefault = xsdRoot.getAttribute('elementFormDefault') || 'unqualified';
+  const elementFormDefault = efDefault === 'qualified' ? 'qualified' : 'unqualified';
+
+  const types = new Map<string, XsdTypeDef>();
+  const topElements = new Map<string, { type: string; elementDecl: Element }>();
+  const identityConstraints: XsdIdentityConstraint[] = [];
+
+  const docNsMap = new Map<string, string>();
+  for (const attr of Array.from(xsdRoot.attributes)) {
+    if (attr.name.startsWith('xmlns:')) {
+      docNsMap.set(attr.name.substring(6), attr.value);
+    } else if (attr.name === 'xmlns') {
+      docNsMap.set('', attr.value);
+    }
+  }
+
+  const imports = new Map<string, string>();
+  for (const impEl of xsdChildren(xsdRoot, 'import')) {
+    const ns = impEl.getAttribute('namespace') || '';
+    if (ns) {
+      imports.set(ns, impEl.getAttribute('schemaLocation') || '');
+    }
+  }
+
+  const allDocs = [xsdDoc, ...additionalDocs];
+
+  for (const currentDoc of allDocs) {
+    const rootEl = currentDoc.documentElement;
+    if (!rootEl) continue;
+
+    const currentDocNsMap = new Map<string, string>(docNsMap);
+    for (const attr of Array.from(rootEl.attributes)) {
+      if (attr.name.startsWith('xmlns:')) {
+        currentDocNsMap.set(attr.name.substring(6), attr.value);
+      } else if (attr.name === 'xmlns') {
+        currentDocNsMap.set('', attr.value);
+      }
+    }
+
+    // Pass 1: Collect named simpleType definitions
+    for (const stEl of Array.from(currentDoc.getElementsByTagNameNS('*', 'simpleType'))) {
+      const stName = stEl.getAttribute('name');
+      if (stName) {
+        types.set(stName, parseSimpleType(stEl, stName));
+      }
+    }
+
+    // Pass 2: Collect named complexType definitions
+    for (const ctEl of Array.from(currentDoc.getElementsByTagNameNS('*', 'complexType'))) {
+      const ctName = ctEl.getAttribute('name');
+      if (ctName) {
+        types.set(ctName, parseComplexType(ctEl, ctName, currentDocNsMap));
+      }
+    }
+
+    // Pass 3: Collect top-level element declarations and their inline types
+    for (const elDecl of Array.from(currentDoc.getElementsByTagNameNS('*', 'element'))) {
+      if (elDecl.parentNode !== rootEl) continue;
+
+      const elName = elDecl.getAttribute('name');
+      if (!elName) continue;
+
+      let elType = resolveTypeRef(elDecl.getAttribute('type') || '');
+
+      // Check for inline complexType
+      const inlineCT = xsdChild(elDecl, 'complexType');
+      if (inlineCT) {
+        const inlineTypeName = `__inline_${elName}`;
+        types.set(inlineTypeName, parseComplexType(inlineCT, inlineTypeName, currentDocNsMap));
+        elType = inlineTypeName;
+      }
+
+      // Check for inline simpleType
+      const inlineST = xsdChild(elDecl, 'simpleType');
+      if (inlineST) {
+        const inlineTypeName = `__inline_${elName}`;
+        types.set(inlineTypeName, parseSimpleType(inlineST, inlineTypeName));
+        elType = inlineTypeName;
+      }
+
+      topElements.set(elName, { type: elType, elementDecl: elDecl });
+
+      // Collect identity constraints from top-level elements
+      identityConstraints.push(...parseIdentityConstraints(elDecl));
+    }
+
+    // Pass 4: Resolve inline types for nested element declarations
+    for (const elDecl of Array.from(currentDoc.getElementsByTagNameNS('*', 'element'))) {
+      if (elDecl.parentNode === rootEl) continue;
+      const elName = elDecl.getAttribute('name');
+      if (!elName) continue;
+
+      const inlineCT = xsdChild(elDecl, 'complexType');
+      if (inlineCT) {
+        const parentElDecl = closestXsdAncestor(elDecl, 'element');
+        const parentName = parentElDecl?.getAttribute('name') || 'anon';
+        const inlineTypeName = `__inline_${parentName}_${elName}`;
+        if (!types.has(inlineTypeName)) {
+          types.set(inlineTypeName, parseComplexType(inlineCT, inlineTypeName, currentDocNsMap));
+        }
+      }
+
+      const inlineST = xsdChild(elDecl, 'simpleType');
+      if (inlineST) {
+        const parentElDecl = closestXsdAncestor(elDecl, 'element');
+        const parentName = parentElDecl?.getAttribute('name') || 'anon';
+        const inlineTypeName = `__inline_${parentName}_${elName}`;
+        if (!types.has(inlineTypeName)) {
+          types.set(inlineTypeName, parseSimpleType(inlineST, inlineTypeName));
+        }
+      }
+
+      // Collect identity constraints from nested elements
+      identityConstraints.push(...parseIdentityConstraints(elDecl));
+    }
+  }
+
+  return { targetNamespace, elementFormDefault, types, topElements, identityConstraints, imports, namespaces: docNsMap };
+}
+
+/** Validate a value against XSD built-in types */
+function validateXsdBuiltinType(
+  value: string,
+  typeName: string,
+  elementName: string
+): XmlValidationError | null {
+  const t = typeName.toLowerCase();
+  if (!value) return null;
+
+  if ((t === 'integer' || t === 'int' || t === 'long' || t === 'short' || t === 'byte' ||
+       t === 'nonnegativeinteger' || t === 'positiveinteger' || t === 'negativeinteger' ||
+       t === 'nonpositiveinteger' || t === 'unsignedint' || t === 'unsignedlong' ||
+       t === 'unsignedshort' || t === 'unsignedbyte') && !/^-?\d+$/.test(value)) {
+    return {
+      message: `Type mismatch for <${elementName}>: expected '${typeName}', but found non-integer '${value}'.`,
+      category: 'schema-violation',
+      suggestion: `Provide a valid integer value for element <${elementName}>.`,
+    };
+  }
+  if ((t === 'decimal' || t === 'float' || t === 'double') && !/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(value)) {
+    return {
+      message: `Type mismatch for <${elementName}>: expected '${typeName}', but found invalid number '${value}'.`,
+      category: 'schema-violation',
+      suggestion: `Provide a valid decimal/float value (e.g. 19.99) for <${elementName}>.`,
+    };
+  }
+  if ((t === 'date') && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return {
+      message: `Type mismatch for <${elementName}>: expected ISO Date (YYYY-MM-DD), but found '${value}'.`,
+      category: 'schema-violation',
+      suggestion: `Format the date as YYYY-MM-DD (e.g. 2026-10-11) for <${elementName}>.`,
+    };
+  }
+  if ((t === 'datetime') && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+    return {
+      message: `Type mismatch for <${elementName}>: expected ISO DateTime, but found '${value}'.`,
+      category: 'schema-violation',
+      suggestion: `Format as YYYY-MM-DDTHH:MM:SS (e.g. 2026-10-11T08:30:00Z) for <${elementName}>.`,
+    };
+  }
+  if ((t === 'time') && !/^\d{2}:\d{2}:\d{2}/.test(value)) {
+    return {
+      message: `Type mismatch for <${elementName}>: expected ISO Time (HH:MM:SS), but found '${value}'.`,
+      category: 'schema-violation',
+      suggestion: `Format as HH:MM:SS (e.g. 08:30:00) for <${elementName}>.`,
+    };
+  }
+  if (t === 'boolean' && !['true', 'false', '0', '1'].includes(value.toLowerCase())) {
+    return {
+      message: `Type mismatch for <${elementName}>: expected boolean ('true'/'false'/'0'/'1'), but found '${value}'.`,
+      category: 'schema-violation',
+      suggestion: `Use 'true', 'false', '0', or '1' for <${elementName}>.`,
+    };
+  }
+  if ((t === 'anyuri' || t === 'uri') && value.includes(' ')) {
+    return {
+      message: `Type mismatch for <${elementName}>: expected anyURI, but found value with spaces '${value}'.`,
+      category: 'schema-violation',
+      suggestion: `Provide a valid URI without spaces for <${elementName}>.`,
+    };
+  }
+
+  return null;
+}
+
+/** Validate a value against simple type facets */
+function validateSimpleTypeFacets(
+  value: string,
+  typeDef: XsdSimpleTypeDef,
+  elementName: string
+): XmlValidationError[] {
+  const errs: XmlValidationError[] = [];
+  const { facets } = typeDef;
+
+  // First validate against base type
+  const baseErr = validateXsdBuiltinType(value, typeDef.baseType, elementName);
+  if (baseErr) errs.push(baseErr);
+
+  // Enumeration
+  if (facets.enumeration && facets.enumeration.length > 0 && !facets.enumeration.includes(value)) {
+    errs.push({
+      message: `Value '${value}' for <${elementName}> is not in the allowed enumeration: [${facets.enumeration.join(', ')}].`,
+      category: 'schema-violation',
+      suggestion: `Use one of: ${facets.enumeration.join(', ')}`,
+    });
+  }
+
+  // Pattern
+  if (facets.pattern) {
+    try {
+      const re = new RegExp(`^${facets.pattern}$`);
+      if (!re.test(value)) {
+        errs.push({
+          message: `Value '${value}' for <${elementName}> does not match pattern '${facets.pattern}'.`,
+          category: 'schema-violation',
+          suggestion: `Provide a value matching the pattern /${facets.pattern}/ for <${elementName}>.`,
+        });
+      }
+    } catch {
+      // Invalid regex in schema — skip
+    }
+  }
+
+  // Length facets
+  if (facets.minLength !== undefined && value.length < facets.minLength) {
+    errs.push({
+      message: `Value for <${elementName}> is too short (${value.length} chars). Minimum length is ${facets.minLength}.`,
+      category: 'schema-violation',
+      suggestion: `Provide at least ${facets.minLength} characters for <${elementName}>.`,
+    });
+  }
+  if (facets.maxLength !== undefined && value.length > facets.maxLength) {
+    errs.push({
+      message: `Value for <${elementName}> is too long (${value.length} chars). Maximum length is ${facets.maxLength}.`,
+      category: 'schema-violation',
+      suggestion: `Provide at most ${facets.maxLength} characters for <${elementName}>.`,
+    });
+  }
+
+  // Numeric range facets
+  const numVal = parseFloat(value);
+  if (!isNaN(numVal)) {
+    if (facets.minInclusive !== undefined && numVal < facets.minInclusive) {
+      errs.push({
+        message: `Value '${value}' for <${elementName}> is below minimum (minInclusive: ${facets.minInclusive}).`,
+        category: 'schema-violation',
+        suggestion: `Provide a value >= ${facets.minInclusive} for <${elementName}>.`,
+      });
+    }
+    if (facets.maxInclusive !== undefined && numVal > facets.maxInclusive) {
+      errs.push({
+        message: `Value '${value}' for <${elementName}> exceeds maximum (maxInclusive: ${facets.maxInclusive}).`,
+        category: 'schema-violation',
+        suggestion: `Provide a value <= ${facets.maxInclusive} for <${elementName}>.`,
+      });
+    }
+    if (facets.minExclusive !== undefined && numVal <= facets.minExclusive) {
+      errs.push({
+        message: `Value '${value}' for <${elementName}> must be > ${facets.minExclusive} (minExclusive).`,
+        category: 'schema-violation',
+      });
+    }
+    if (facets.maxExclusive !== undefined && numVal >= facets.maxExclusive) {
+      errs.push({
+        message: `Value '${value}' for <${elementName}> must be < ${facets.maxExclusive} (maxExclusive).`,
+        category: 'schema-violation',
+      });
+    }
+    if (facets.totalDigits !== undefined) {
+      const digitsOnly = value.replace(/[^0-9]/g, '');
+      if (digitsOnly.length > facets.totalDigits) {
+        errs.push({
+          message: `Value '${value}' for <${elementName}> exceeds totalDigits restriction (${facets.totalDigits}).`,
+          category: 'schema-violation',
+        });
+      }
+    }
+    if (facets.fractionDigits !== undefined) {
+      const fracPart = value.split('.')[1] || '';
+      if (fracPart.length > facets.fractionDigits) {
+        errs.push({
+          message: `Value '${value}' for <${elementName}> exceeds fractionDigits restriction (${facets.fractionDigits}).`,
+          category: 'schema-violation',
+        });
+      }
+    }
+  }
+
+  return errs;
+}
+
+/** Resolve the type definition for an element, checking inline types and named types */
+function resolveElementType(
+  elName: string,
+  parentTypeName: string,
+  schema: CompiledXsdSchema
+): XsdTypeDef | null {
+  // Check for inline type first
+  const inlineKey = `__inline_${parentTypeName.replace('__inline_', '')}_${elName}`;
+  if (schema.types.has(inlineKey)) return schema.types.get(inlineKey)!;
+
+  // Check in compositor elements for type reference
+  const parentType = schema.types.get(parentTypeName);
+  if (parentType?.kind === 'complex' && parentType.compositor) {
+    const elDecl = parentType.compositor.elements.find((e) => e.name === elName);
+    if (elDecl && elDecl.type) {
+      if (schema.types.has(elDecl.type)) return schema.types.get(elDecl.type)!;
+      // Built-in type — return a synthetic simple type
+      return { kind: 'simple', name: elDecl.type, baseType: elDecl.type, facets: {} };
+    }
+  }
+
+  // Check top-level named types
+  // Search for __inline_<any>_<elName> pattern
+  for (const [key, def] of schema.types) {
+    if (key.endsWith(`_${elName}`) && key.startsWith('__inline_')) {
+      return def;
+    }
+  }
+
+  return null;
+}
+
 /**
  * Client-Side XSD Schema Rule Validation
- * Checks element hierarchy, presence of required elements, and basic types
+ * Comprehensive validation with schema compilation, namespace support,
+ * cardinality enforcement, attribute checking, simple type facets,
+ * sequence ordering, and identity constraints.
  */
-export function validateAgainstXsd(xml: string, xsd: string): XsdValidationResult {
-  if (!xml.trim()) {
+export function validateAgainstXsd(
+  xml: string,
+  xsd: string,
+  additionalSchemas?: string[] | Record<string, string | { xsd: string }> | Map<string, string>
+): XsdValidationResult {
+  // Normalize leading blank lines or whitespace before XML prolog if present
+  const cleanXml = xml.replace(/^[\s\r\n]+(?=<\?xml)/i, '').trim();
+  const cleanXsd = xsd.replace(/^[\s\r\n]+(?=<\?xml)/i, '').trim();
+
+  if (!cleanXml) {
     return {
       isValid: false,
-      errors: [{ message: 'XML document is empty.', category: 'no-root' }],
+      errors: [{ message: 'XML document is empty.', category: 'no-root', source: 'xml' }],
       warnings: [],
     };
   }
-  if (!xsd.trim()) {
+  if (!cleanXsd) {
     return {
       isValid: false,
-      errors: [{ message: 'XSD schema is empty.', category: 'schema-violation' }],
+      errors: [{ message: 'XSD schema is empty.', category: 'schema-violation', source: 'xsd' }],
       warnings: [],
     };
   }
 
-  // First validate XML structure
-  const xmlValidation = validateXmlStructure(xml);
+  // First validate XML well-formedness
+  const xmlValidation = validateXmlStructure(cleanXml);
   if (!xmlValidation.isValid) {
     return {
       isValid: false,
-      errors: xmlValidation.errors,
-      warnings: [],
+      errors: xmlValidation.errors.map((e) => ({ ...e, source: 'xml' as const })),
+      warnings: ['Fix XML well-formedness errors before validating against XSD schema.'],
     };
   }
 
-  // Validate XSD structure
-  const xsdValidation = validateXmlStructure(xsd);
+  // Validate XSD well-formedness
+  const xsdValidation = validateXmlStructure(cleanXsd);
   if (!xsdValidation.isValid) {
     return {
       isValid: false,
       errors: [
         {
-          message: `XSD Schema syntax error: ${xsdValidation.errors[0]?.message}`,
+          message: `XSD Schema compilation error: ${xsdValidation.errors[0]?.message}`,
           line: xsdValidation.errors[0]?.line,
           column: xsdValidation.errors[0]?.column,
           snippet: xsdValidation.errors[0]?.snippet,
           category: 'schema-violation',
-          suggestion: 'Ensure the XSD schema is itself a well-formed XML schema with <xs:schema>.',
+          code: 'ERR_XSD_COMPILATION',
+          source: 'xsd',
+          suggestion: 'The XSD schema itself has syntax errors. Ensure it is a well-formed XML document with <xs:schema> root.',
         },
       ],
       warnings: [],
@@ -2260,61 +2974,498 @@ export function validateAgainstXsd(xml: string, xsd: string): XsdValidationResul
   }
 
   const parser = new DOMParser();
-  const xmlDoc = parser.parseFromString(xml, 'application/xml');
-  const xsdDoc = parser.parseFromString(xsd, 'application/xml');
+  const xmlDoc = parser.parseFromString(cleanXml, 'application/xml');
+  const xsdDoc = parser.parseFromString(cleanXsd, 'application/xml');
 
-  const xsdRoot = xsdDoc.documentElement;
-  if (!xsdRoot || !xsdRoot.nodeName.includes('schema')) {
+  const additionalDocs: Document[] = [];
+  if (additionalSchemas) {
+    let schemaList: string[] = [];
+    if (Array.isArray(additionalSchemas)) {
+      schemaList = additionalSchemas;
+    } else if (additionalSchemas instanceof Map) {
+      schemaList = Array.from(additionalSchemas.values());
+    } else if (typeof additionalSchemas === 'object') {
+      schemaList = Object.values(additionalSchemas).map((v) => (typeof v === 'string' ? v : v.xsd));
+    }
+    for (const addXsd of schemaList) {
+      if (typeof addXsd === 'string' && addXsd.trim()) {
+        try {
+          const doc = parser.parseFromString(addXsd, 'application/xml');
+          if (!doc.getElementsByTagName('parsererror').length) {
+            additionalDocs.push(doc);
+          }
+        } catch {
+          // Ignore auxiliary parse error
+        }
+      }
+    }
+  }
+
+  // Compile XSD schema
+  const schemaResult = compileXsdSchema(xsdDoc, additionalDocs);
+  if ('error' in schemaResult) {
     return {
       isValid: false,
       errors: [
         {
-          message: 'Root element of schema must be <xs:schema> or <xsd:schema>.',
+          message: `XSD Schema compilation error: ${schemaResult.error}`,
           category: 'schema-violation',
+          code: 'ERR_XSD_COMPILATION',
+          source: 'xsd',
         },
       ],
       warnings: [],
     };
   }
 
+  const schema = schemaResult;
   const errors: XmlValidationError[] = [];
   const warnings: string[] = [];
 
   const xmlRoot = xmlDoc.documentElement;
-  const rootLocalName = xmlRoot.localName || xmlRoot.nodeName.split(':').pop() || '';
+  const rootLocalName_ = xmlRoot.localName || xmlRoot.nodeName.split(':').pop() || '';
 
-  // Look for top-level xs:element definitions in XSD
-  const topElements = Array.from(xsdDoc.getElementsByTagNameNS('*', 'element')).filter(
-    (el) => el.parentNode === xsdRoot
-  );
+  // ─── Phase 1: Root Element & Namespace Validation ──────────────────────────
+  if (schema.targetNamespace) {
+    const xmlNs = xmlRoot.getAttribute('xmlns') || xmlRoot.namespaceURI || '';
+    if (!xmlNs && schema.elementFormDefault === 'qualified') {
+      errors.push({
+        message: `Missing targetNamespace: Schema specifies targetNamespace '${schema.targetNamespace}' with elementFormDefault="qualified", but root element <${xmlRoot.nodeName}> declares no namespace.`,
+        category: 'namespace',
+        code: 'ERR_XSD_NAMESPACE_MISSING',
+        suggestion: `Add xmlns="${schema.targetNamespace}" to root element <${xmlRoot.nodeName}>.`,
+      });
+    } else if (xmlNs && xmlNs !== schema.targetNamespace && xmlNs !== 'http://www.w3.org/XML/1998/namespace') {
+      errors.push({
+        message: `Namespace mismatch: XML document root namespace '${xmlNs}' does not match schema targetNamespace '${schema.targetNamespace}'.`,
+        category: 'namespace',
+        code: 'ERR_XSD_NAMESPACE_MISMATCH',
+        suggestion: `Update root element namespace to xmlns="${schema.targetNamespace}".`,
+      });
+    }
+  }
 
-  const matchedTopElement = topElements.find(
-    (el) => el.getAttribute('name') === rootLocalName
-  );
-
-  if (topElements.length > 0 && !matchedTopElement) {
-    const declaredNames = topElements
-      .map((el) => el.getAttribute('name'))
-      .filter(Boolean)
-      .join(', ');
+  const matchedTopEl = schema.topElements.get(rootLocalName_);
+  if (schema.topElements.size > 0 && !matchedTopEl) {
+    const declaredNames = Array.from(schema.topElements.keys()).join(', ');
     errors.push({
-      message: `Root element <${xmlRoot.nodeName}> does not match any top-level schema element: [${declaredNames}].`,
+      message: `Root element <${xmlRoot.nodeName}> does not match any top-level schema element declaration: [${declaredNames}].`,
       category: 'schema-violation',
-      suggestion: `Rename XML root to <${topElements[0]?.getAttribute('name')}> or update the XSD schema definition.`,
+      code: 'ERR_XSD_ROOT_MISMATCH',
+      suggestion: `Rename XML root element to one of: ${declaredNames}; or add a top-level <xs:element name="${rootLocalName_}"> in the schema.`,
     });
   }
 
-  // Check required child elements (minOccurs >= 1 or default 1) inside sequences
+  // ─── Phase 2: Recursive Element + Type Validation ──────────────────────────
+  function validateElement(
+    xmlEl: Element,
+    typeName: string,
+    parentPath: string
+  ): void {
+    const elLocal = xmlEl.localName || xmlEl.nodeName.split(':').pop() || '';
+    const currentPath = `${parentPath}/${elLocal}`;
+    const typeDef = schema.types.get(typeName);
+
+    if (!typeDef) {
+      // It's likely a built-in type — validate text content
+      const val = (xmlEl.textContent || '').trim();
+      if (val) {
+        const typeErr = validateXsdBuiltinType(val, typeName, elLocal);
+        if (typeErr) errors.push({ ...typeErr, code: 'ERR_XSD_TYPE_MISMATCH' });
+      }
+      return;
+    }
+
+    // Simple type validation
+    if (typeDef.kind === 'simple') {
+      const val = (xmlEl.textContent || '').trim();
+      if (val) {
+        const facetErrs = validateSimpleTypeFacets(val, typeDef, elLocal);
+        for (const fe of facetErrs) {
+          errors.push({ ...fe, code: 'ERR_XSD_FACET_VIOLATION' });
+        }
+      }
+      // Simple type elements should not have child elements
+      if (xmlEl.children.length > 0) {
+        errors.push({
+          message: `Element <${elLocal}> at ${currentPath} has child elements but is declared as simple type '${typeDef.name}'.`,
+          category: 'schema-violation',
+          code: 'ERR_XSD_SIMPLE_HAS_CHILDREN',
+          suggestion: `Remove child elements from <${elLocal}> — it should contain only text content.`,
+        });
+      }
+      return;
+    }
+
+    // Complex type validation
+    if (typeDef.kind === 'complex') {
+      // Attribute validation
+      for (const attrDecl of typeDef.attributes) {
+        if (attrDecl.isAny) continue;
+
+        let hasAttr = false;
+        let actualVal: string | null = null;
+        let matchedAttrName = attrDecl.name;
+
+        if (attrDecl.isRef && attrDecl.prefix) {
+          const qName = `${attrDecl.prefix}:${attrDecl.name}`;
+          if (xmlEl.hasAttribute(qName)) {
+            hasAttr = true;
+            actualVal = xmlEl.getAttribute(qName);
+            matchedAttrName = qName;
+          } else if (attrDecl.namespaceURI && xmlEl.hasAttributeNS && xmlEl.hasAttributeNS(attrDecl.namespaceURI, attrDecl.name)) {
+            hasAttr = true;
+            actualVal = xmlEl.getAttributeNS(attrDecl.namespaceURI, attrDecl.name);
+            matchedAttrName = qName;
+          } else {
+            const found = Array.from(xmlEl.attributes).find(
+              (a) =>
+                (a.localName === attrDecl.name || a.name.split(':').pop() === attrDecl.name) &&
+                (a.prefix === attrDecl.prefix || (attrDecl.namespaceURI && a.namespaceURI === attrDecl.namespaceURI))
+            );
+            if (found) {
+              hasAttr = true;
+              actualVal = found.value;
+              matchedAttrName = found.name;
+            }
+          }
+        } else {
+          if (xmlEl.hasAttribute(attrDecl.name)) {
+            hasAttr = true;
+            actualVal = xmlEl.getAttribute(attrDecl.name);
+            matchedAttrName = attrDecl.name;
+          }
+        }
+
+        const displayName = attrDecl.isRef && attrDecl.ref ? attrDecl.ref : attrDecl.name;
+
+        if (attrDecl.use === 'required' && !hasAttr) {
+          errors.push({
+            message: `Required attribute '${displayName}' is missing on element <${elLocal}> at ${currentPath}.`,
+            category: 'schema-violation',
+            code: 'ERR_XSD_ATTR_REQUIRED',
+            suggestion: `Add attribute ${displayName}="..." to <${elLocal}>.`,
+          });
+        }
+        if (attrDecl.use === 'prohibited' && hasAttr) {
+          errors.push({
+            message: `Prohibited attribute '${matchedAttrName}' found on element <${elLocal}> at ${currentPath}.`,
+            category: 'schema-violation',
+            code: 'ERR_XSD_ATTR_PROHIBITED',
+            suggestion: `Remove attribute '${matchedAttrName}' from <${elLocal}>.`,
+          });
+        }
+        if (attrDecl.fixedValue && hasAttr && actualVal !== attrDecl.fixedValue) {
+          errors.push({
+            message: `Attribute '${matchedAttrName}' on <${elLocal}> has value '${actualVal}' but schema requires fixed value '${attrDecl.fixedValue}'.`,
+            category: 'schema-violation',
+            code: 'ERR_XSD_ATTR_FIXED',
+            suggestion: `Set ${matchedAttrName}="${attrDecl.fixedValue}" on <${elLocal}>.`,
+          });
+        }
+        if (hasAttr && attrDecl.type && actualVal !== null) {
+          const attrTypeErr = validateXsdBuiltinType(actualVal, attrDecl.type, `@${matchedAttrName} on <${elLocal}>`);
+          if (attrTypeErr) errors.push({ ...attrTypeErr, code: 'ERR_XSD_ATTR_TYPE' });
+        }
+      }
+
+      // Compositor (child element) validation
+      if (typeDef.compositor) {
+        const comp = typeDef.compositor;
+        const childElements = Array.from(xmlEl.children);
+        const hasWildcard = comp.elements.some((e) => e.isAny);
+
+        function matchesDecl(childEl: Element, elDecl: XsdElementDecl): boolean {
+          if (elDecl.isAny) {
+            const childNs = childEl.namespaceURI || (childEl.prefix ? xmlEl.lookupNamespaceURI(childEl.prefix) : null);
+            const anyNs = elDecl.anyNamespace || '##any';
+            if (anyNs === '##any') return true;
+            if (anyNs === '##other') return childNs !== schema.targetNamespace;
+            if (anyNs === childNs) return true;
+            return false;
+          }
+
+          const childLocal = childEl.localName || childEl.nodeName.split(':').pop() || '';
+          if (childLocal !== elDecl.name) return false;
+
+          const childNs = childEl.namespaceURI || (childEl.prefix ? xmlEl.lookupNamespaceURI(childEl.prefix) : null);
+          const childPrefix = childEl.prefix || (childEl.nodeName.includes(':') ? childEl.nodeName.split(':')[0] : null);
+
+          if (elDecl.isRef) {
+            if (elDecl.namespaceURI && childNs && childNs !== elDecl.namespaceURI) return false;
+            if (elDecl.prefix && childPrefix && childPrefix !== elDecl.prefix) return false;
+            return true;
+          }
+
+          if (schema.elementFormDefault === 'qualified' && schema.targetNamespace) {
+            if (childNs && childNs !== schema.targetNamespace) return false;
+          }
+          return true;
+        }
+
+        // Check for unexpected child elements
+        if (!hasWildcard) {
+          for (const childEl of childElements) {
+            const matchesAny = comp.elements.some((e) => matchesDecl(childEl, e));
+            if (!matchesAny) {
+              warnings.push(
+                `Unexpected element <${childEl.nodeName}> found under <${elLocal}> at ${currentPath}. Schema does not declare this child.`
+              );
+            }
+          }
+        }
+
+        // Check cardinality (minOccurs / maxOccurs)
+        for (const elDecl of comp.elements) {
+          if (elDecl.isAny) continue;
+
+          const matchingChildren = childElements.filter((c) => matchesDecl(c, elDecl));
+          const count = matchingChildren.length;
+          const displayName = elDecl.ref || elDecl.name;
+
+          if (count < elDecl.minOccurs) {
+            if (elDecl.minOccurs === 1 && count === 0) {
+              errors.push({
+                message: `Required element <${displayName}> is missing under <${elLocal}> at ${currentPath}.`,
+                category: 'schema-violation',
+                code: 'ERR_XSD_ELEMENT_MISSING',
+                suggestion: `Add a <${displayName}> child element under <${elLocal}>.`,
+              });
+            } else {
+              errors.push({
+                message: `Element <${displayName}> occurs ${count} time(s) under <${elLocal}>, but minOccurs="${elDecl.minOccurs}" requires at least ${elDecl.minOccurs}.`,
+                category: 'schema-violation',
+                code: 'ERR_XSD_MIN_OCCURS',
+                suggestion: `Add ${elDecl.minOccurs - count} more <${displayName}> element(s) under <${elLocal}>.`,
+              });
+            }
+          }
+
+          if (elDecl.maxOccurs !== -1 && count > elDecl.maxOccurs) {
+            errors.push({
+              message: `Element <${displayName}> occurs ${count} time(s) under <${elLocal}>, but maxOccurs="${elDecl.maxOccurs}" allows at most ${elDecl.maxOccurs}.`,
+              category: 'schema-violation',
+              code: 'ERR_XSD_MAX_OCCURS',
+              suggestion: `Remove ${count - elDecl.maxOccurs} excess <${displayName}> element(s) from <${elLocal}>.`,
+            });
+          }
+
+          // Recursively validate each matching child element
+          for (const matchChild of matchingChildren) {
+            // Check xsi:nil attribute
+            if (matchChild.getAttribute('xsi:nil') === 'true' && !elDecl.nillable) {
+              errors.push({
+                message: `Element <${matchChild.nodeName}> has xsi:nil="true", but is not declared with nillable="true" in schema.`,
+                category: 'schema-violation',
+                code: 'ERR_XSD_NOT_NILLABLE',
+                suggestion: `Remove xsi:nil="true" or add nillable="true" to the <xs:element name="${elDecl.name}"> declaration in schema.`,
+              });
+            }
+
+            let childTypeName = elDecl.type;
+
+            // Look up inline type
+            const inlineKey = `__inline_${typeName.replace('__inline_', '')}_${elDecl.name}`;
+            if (schema.types.has(inlineKey)) {
+              childTypeName = inlineKey;
+            } else if (!childTypeName && schema.types.has(`__inline_${elDecl.name}`)) {
+              childTypeName = `__inline_${elDecl.name}`;
+            }
+
+            // Try resolving the type from nested element declarations
+            if (!childTypeName) {
+              const resolvedType = resolveElementType(elDecl.name, typeName, schema);
+              if (resolvedType) {
+                childTypeName = resolvedType.name;
+              }
+            }
+
+            if (childTypeName) {
+              validateElement(matchChild, childTypeName, currentPath);
+            }
+          }
+        }
+
+        // xs:choice validation
+        if (comp.kind === 'choice') {
+          const presentChoiceElements = comp.elements.filter((e) =>
+            childElements.some((c) => matchesDecl(c, e))
+          );
+          if (presentChoiceElements.length > 1) {
+            errors.push({
+              message: `xs:choice violation under <${elLocal}>: Multiple mutually exclusive elements found [${presentChoiceElements.map((e) => e.ref || e.name).join(', ')}]. xs:choice permits only one.`,
+              category: 'schema-violation',
+              code: 'ERR_XSD_CHOICE_MUTEX',
+              suggestion: `Keep only one of [${comp.elements.map((e) => e.ref || e.name).join(', ')}] under <${elLocal}>.`,
+            });
+          } else if (presentChoiceElements.length === 0 && comp.minOccurs > 0) {
+            errors.push({
+              message: `xs:choice violation under <${elLocal}>: None of the permitted choice elements [${comp.elements.map((e) => e.ref || e.name).join(', ')}] were found.`,
+              category: 'schema-violation',
+              code: 'ERR_XSD_CHOICE_MISSING',
+              suggestion: `Add one of [${comp.elements.map((e) => e.ref || e.name).join(', ')}] under <${elLocal}>.`,
+            });
+          }
+        }
+
+        // Sequence ordering check
+        if (comp.kind === 'sequence') {
+          let lastDeclIdx = -1;
+          for (const childEl of childElements) {
+            const declIdx = comp.elements.findIndex((e) => matchesDecl(childEl, e));
+            if (declIdx >= 0) {
+              if (declIdx < lastDeclIdx) {
+                const expectedBefore = comp.elements[lastDeclIdx]?.ref || comp.elements[lastDeclIdx]?.name || '?';
+                errors.push({
+                  message: `Element <${childEl.nodeName}> appears out of sequence order under <${elLocal}>. It must appear before <${expectedBefore}> per xs:sequence declaration.`,
+                  category: 'schema-violation',
+                  code: 'ERR_XSD_SEQUENCE_ORDER',
+                  suggestion: `Move <${childEl.nodeName}> before <${expectedBefore}> in the XML payload.`,
+                });
+                warnings.push(
+                  `Element <${childEl.nodeName}> appears out of sequence order under <${elLocal}>. It should appear before <${expectedBefore}> per xs:sequence declaration.`
+                );
+              }
+              lastDeclIdx = declIdx;
+            }
+          }
+        }
+      } else if (!typeDef.mixed && xmlEl.children.length > 0) {
+        // Complex type with no compositor but has child elements
+        warnings.push(
+          `Element <${elLocal}> at ${currentPath} has child elements but its complex type declares no compositor (sequence/choice/all).`
+        );
+      }
+    }
+  }
+
+  // Start validation from the root
+  if (matchedTopEl) {
+    validateElement(xmlRoot, matchedTopEl.type, '');
+  }
+
+  // ─── Phase 3: Identity Constraints (xs:unique, xs:key, xs:keyref) ──────────
+  const definedKeySets = new Map<string, Set<string>>();
+  // Sort so unique and key are evaluated before keyref
+  const sortedConstraints = [...schema.identityConstraints].sort((a, b) => {
+    if (a.kind === 'keyref' && b.kind !== 'keyref') return 1;
+    if (a.kind !== 'keyref' && b.kind === 'keyref') return -1;
+    return 0;
+  });
+
+  for (const constraint of sortedConstraints) {
+    try {
+      // Simple XPath evaluation — supports basic paths like "./item" or "."
+      const selectorPath = constraint.selector.replace(/^\.\/?/, '');
+      let selectedNodes: Element[];
+
+      if (!selectorPath || selectorPath === '.') {
+        selectedNodes = [xmlRoot];
+      } else {
+        const parts = selectorPath.split('/').filter(Boolean);
+        selectedNodes = [xmlRoot];
+        for (const part of parts) {
+          const nextNodes: Element[] = [];
+          for (const node of selectedNodes) {
+            for (const child of Array.from(node.children)) {
+              const childLocal = child.localName || child.nodeName.split(':').pop() || '';
+              if (childLocal === part || part === '*') {
+                nextNodes.push(child);
+              }
+            }
+          }
+          selectedNodes = nextNodes;
+        }
+      }
+
+      // Collect field values
+      const keyValues = new Map<string, Element>();
+      for (const selectedNode of selectedNodes) {
+        const fieldValues: string[] = [];
+        for (const fieldXPath of constraint.fields) {
+          const fieldPath = fieldXPath.replace(/^\.\/?/, '');
+          if (fieldPath.startsWith('@')) {
+            // Attribute field
+            const attrName = fieldPath.substring(1);
+            fieldValues.push(selectedNode.getAttribute(attrName) || '');
+          } else if (!fieldPath || fieldPath === '.') {
+            fieldValues.push((selectedNode.textContent || '').trim());
+          } else {
+            // Child element field
+            const parts = fieldPath.split('/').filter(Boolean);
+            let current: Element | null = selectedNode;
+            for (const part of parts) {
+              if (!current) break;
+              const matchingChildren: Element[] = Array.from(current.children).filter(
+                (c: Element) => (c.localName || c.nodeName.split(':').pop()) === part
+              );
+              current = matchingChildren[0] || null;
+            }
+            fieldValues.push(current ? (current.textContent || '').trim() : '');
+          }
+        }
+
+        const compositeKey = fieldValues.join('|||');
+
+        if (constraint.kind === 'unique' || constraint.kind === 'key') {
+          // For key, all fields must be non-empty
+          if (constraint.kind === 'key' && fieldValues.some((v) => !v)) {
+            const elLocal = selectedNode.localName || selectedNode.nodeName.split(':').pop() || '';
+            errors.push({
+              message: `Identity constraint '${constraint.name}' (xs:key): Element <${elLocal}> has empty key field(s) [${constraint.fields.join(', ')}].`,
+              category: 'schema-violation',
+              code: 'ERR_XSD_KEY_EMPTY',
+              suggestion: `All key fields must have non-empty values for xs:key '${constraint.name}'.`,
+            });
+          }
+
+          if (keyValues.has(compositeKey)) {
+            const elLocal = selectedNode.localName || selectedNode.nodeName.split(':').pop() || '';
+            errors.push({
+              message: `Identity constraint '${constraint.name}' (xs:${constraint.kind}) violation: Duplicate value '${compositeKey}' found on <${elLocal}>.`,
+              category: 'schema-violation',
+              code: `ERR_XSD_${constraint.kind.toUpperCase()}_DUPLICATE`,
+              suggestion: `Each value of [${constraint.fields.join(', ')}] must be unique per xs:${constraint.kind} '${constraint.name}'.`,
+            });
+          } else {
+            keyValues.set(compositeKey, selectedNode);
+          }
+        } else if (constraint.kind === 'keyref') {
+          const targetKey = constraint.refer ? resolveTypeRef(constraint.refer) : '';
+          const targetSet = definedKeySets.get(targetKey);
+          if (targetSet && compositeKey && !targetSet.has(compositeKey)) {
+            const elLocal = selectedNode.localName || selectedNode.nodeName.split(':').pop() || '';
+            errors.push({
+              message: `Identity constraint '${constraint.name}' (xs:keyref) violation: Key reference '${compositeKey}' on <${elLocal}> does not match any key in '${constraint.refer}'.`,
+              category: 'schema-violation',
+              code: 'ERR_XSD_KEYREF_UNRESOLVED',
+              suggestion: `Ensure key reference value '${compositeKey}' exists in target identity constraint '${constraint.refer}'.`,
+            });
+          }
+        }
+      }
+
+      if (constraint.kind === 'unique' || constraint.kind === 'key') {
+        definedKeySets.set(constraint.name, new Set(keyValues.keys()));
+      }
+    } catch {
+      // XPath evaluation failed — skip this constraint silently
+      warnings.push(`Could not evaluate identity constraint '${constraint.name}' — XPath expression may be too complex for client-side evaluation.`);
+    }
+  }
+
+  // ─── Phase 4: Legacy compatibility checks (preserved from original) ────────
+  // Check all schema element declarations for type validation across the document
   const allSchemaElements = Array.from(xsdDoc.getElementsByTagNameNS('*', 'element'));
   allSchemaElements.forEach((schemaEl) => {
     const elName = schemaEl.getAttribute('name');
     const minOccurs = schemaEl.getAttribute('minOccurs');
     const type = schemaEl.getAttribute('type');
 
+    // Required element check for elements not yet validated via recursive walk
     if (elName && (minOccurs === '1' || minOccurs === null)) {
-      // If this element's parent is inside a complexType belonging to an element present in the XML
-      const parentComplex = schemaEl.closest('complexType');
-      const parentElement = parentComplex?.closest('element');
+      const parentComplex = closestXsdAncestor(schemaEl, 'complexType');
+      const parentElement = parentComplex ? closestXsdAncestor(parentComplex, 'element') : null;
       const parentElName = parentElement?.getAttribute('name');
 
       if (parentElName) {
@@ -2325,57 +3476,366 @@ export function validateAgainstXsd(xml: string, xsd: string): XsdValidationResul
               (c) => (c.localName || c.nodeName.split(':').pop()) === elName
             );
             if (!hasChild) {
-              warnings.push(
-                `Schema Advisory: Required element <${elName}> (minOccurs="1") is missing under parent <${parentElName}>.`
-              );
+              // Avoid duplicate warnings from recursive validation
+              const warnMsg = `Schema Advisory: Required element <${elName}> (minOccurs="1") is missing under parent <${parentElName}>.`;
+              if (!warnings.includes(warnMsg) && !errors.some((e) => e.message.includes(`<${elName}> is missing`))) {
+                warnings.push(warnMsg);
+              }
             }
           });
         }
       }
     }
 
-    // Check basic data type format if element exists in XML
+    // Basic data type format check for elements not yet validated via recursive walk
     if (elName && type) {
+      const resolvedType = resolveTypeRef(type);
       const xmlNodes = xmlDoc.getElementsByTagNameNS('*', elName);
       Array.from(xmlNodes).forEach((node) => {
         const val = (node.textContent || '').trim();
-        if (val) {
-          if (type.includes('integer') && !/^-?\d+$/.test(val)) {
-            errors.push({
-              message: `Type mismatch for <${elName}>: expected '${type}', but found non-integer '${val}'.`,
-              category: 'schema-violation',
-              suggestion: `Provide a valid integer value for element <${elName}>.`,
-            });
-          } else if (type.includes('decimal') && !/^-?\d+(\.\d+)?$/.test(val)) {
-            errors.push({
-              message: `Type mismatch for <${elName}>: expected '${type}', but found invalid decimal '${val}'.`,
-              category: 'schema-violation',
-              suggestion: `Provide a valid decimal value (e.g. 19.99) for <${elName}>.`,
-            });
-          } else if (type.includes('date') && !/^\d{4}-\d{2}-\d{2}/.test(val)) {
-            errors.push({
-              message: `Type mismatch for <${elName}>: expected ISO Date (YYYY-MM-DD), but found '${val}'.`,
-              category: 'schema-violation',
-              suggestion: `Format the date as YYYY-MM-DD (e.g. 2026-10-11) for <${elName}>.`,
-            });
-          } else if (
-            type.includes('boolean') &&
-            !['true', 'false', '0', '1'].includes(val.toLowerCase())
-          ) {
-            errors.push({
-              message: `Type mismatch for <${elName}>: expected boolean ('true'/'false'), but found '${val}'.`,
-              category: 'schema-violation',
-            });
+        if (val && !errors.some((e) => e.message.includes(`<${elName}>`) && e.code === 'ERR_XSD_TYPE_MISMATCH')) {
+          const typeErr = validateXsdBuiltinType(val, resolvedType, elName);
+          if (typeErr && !errors.some((e) => e.message === typeErr.message)) {
+            errors.push({ ...typeErr, code: 'ERR_XSD_TYPE_MISMATCH' });
           }
         }
       });
     }
   });
 
+  // Deduplicate errors (same message)
+  const uniqueErrors: XmlValidationError[] = [];
+  const seenMessages = new Set<string>();
+  for (const err of errors) {
+    if (!seenMessages.has(err.message)) {
+      seenMessages.add(err.message);
+      uniqueErrors.push(err);
+    }
+  }
+
+  // Deduplicate warnings
+  const uniqueWarnings = Array.from(new Set(warnings));
+
   return {
-    isValid: errors.length === 0,
-    errors,
-    warnings,
+    isValid: uniqueErrors.length === 0,
+    errors: uniqueErrors,
+    warnings: uniqueWarnings,
+  };
+}
+
+
+export function autoFixXmlWithXsd(xml: string, xsd: string): AutoFixResult {
+  const startTime = performance.now();
+  const fixes: string[] = [];
+  const diffItems: AutoFixDiffItem[] = [];
+
+  // Normalize leading blank lines or whitespace before XML prolog if present
+  const cleanXsd = xsd.replace(/^[\s\r\n]+(?=<\?xml)/i, '').trim();
+
+  // Check if original is already valid
+  const initialValidation = validateAgainstXsd(xml, cleanXsd);
+  const originalValid = initialValidation.isValid;
+
+  if (originalValid) {
+    return {
+      fixedXml: xml,
+      fixes: [],
+      report: {
+        originalValid: true,
+        finalValid: true,
+        totalPasses: 0,
+        fixes: [],
+        unresolvedIssues: [],
+        securityWarnings: [],
+        executionTimeMs: Math.round(performance.now() - startTime),
+      },
+    };
+  }
+
+  let currentXml = xml;
+
+  // Pass 1: Syntax & Well-Formedness Auto-Repair
+  const syntaxRepair = autoFixXml(currentXml);
+  if (syntaxRepair.fixes.length > 0) {
+    currentXml = syntaxRepair.fixedXml;
+    fixes.push(...syntaxRepair.fixes);
+    diffItems.push(...syntaxRepair.report.fixes);
+  }
+
+  // Pass 2: Schema Compilation Check
+  const xsdValidation = validateXmlStructure(cleanXsd);
+  if (!xsdValidation.isValid) {
+    return {
+      fixedXml: currentXml,
+      fixes,
+      report: {
+        originalValid,
+        finalValid: false,
+        totalPasses: 1,
+        fixes: diffItems,
+        unresolvedIssues: [
+          {
+            message: `XSD Schema compilation error: ${xsdValidation.errors[0]?.message}`,
+            category: 'xsd',
+            code: 'ERR_XSD_COMPILATION',
+            suggestion: 'Fix syntax errors in the XSD schema definition before revalidating.',
+            classification: 'diagnosis-only',
+          },
+        ],
+        securityWarnings: [],
+        executionTimeMs: Math.round(performance.now() - startTime),
+      },
+    };
+  }
+
+  const parser = new DOMParser();
+  const xsdDoc = parser.parseFromString(cleanXsd, 'application/xml');
+  const schemaResult = compileXsdSchema(xsdDoc);
+  if ('error' in schemaResult) {
+    return {
+      fixedXml: currentXml,
+      fixes,
+      report: {
+        originalValid,
+        finalValid: false,
+        totalPasses: 1,
+        fixes: diffItems,
+        unresolvedIssues: [
+          {
+            message: `XSD Schema compilation error: ${schemaResult.error}`,
+            category: 'xsd',
+            code: 'ERR_XSD_COMPILATION',
+            classification: 'diagnosis-only',
+          },
+        ],
+        securityWarnings: [],
+        executionTimeMs: Math.round(performance.now() - startTime),
+      },
+    };
+  }
+
+  const schema = schemaResult;
+
+  // Pass 3: Schema-Guided Structural & Namespace Repairs
+  try {
+    const xmlDoc = parser.parseFromString(currentXml, 'application/xml');
+    const parseError = xmlDoc.getElementsByTagName('parsererror')[0];
+    if (!parseError && xmlDoc.documentElement) {
+      const root = xmlDoc.documentElement;
+      const rootLocal = root.localName || root.nodeName.split(':').pop() || '';
+      let docModified = false;
+
+      // 3a. Missing targetNamespace on root element
+      if (schema.targetNamespace) {
+        const rootNs = root.getAttribute('xmlns') || root.namespaceURI || '';
+        if (!rootNs || rootNs !== schema.targetNamespace) {
+          if (schema.topElements.has(rootLocal) || schema.topElements.size === 0) {
+            root.setAttribute('xmlns', schema.targetNamespace);
+            docModified = true;
+            fixes.push(`Added xmlns="${schema.targetNamespace}" to root element <${root.nodeName}> to match XSD targetNamespace.`);
+            diffItems.push({
+              code: 'FIX_XSD_NAMESPACE',
+              category: 'namespace',
+              classification: 'safe-automatic',
+              confidence: 'high',
+              description: `Configured xmlns="${schema.targetNamespace}" on root <${root.nodeName}> matching schema targetNamespace.`,
+            });
+          }
+        }
+      }
+
+      // 3b. Helper function to recursively repair elements using schema
+      function repairElementWithSchema(el: Element, typeName: string): void {
+        const typeDef = schema.types.get(typeName);
+        if (!typeDef || typeDef.kind !== 'complex') return;
+
+        // Attribute defaults: inject attributes that have defaultValue in schema
+        for (const attrDecl of typeDef.attributes) {
+          if (attrDecl.defaultValue && !el.hasAttribute(attrDecl.name)) {
+            el.setAttribute(attrDecl.name, attrDecl.defaultValue);
+            docModified = true;
+            const elLocal = el.localName || el.nodeName.split(':').pop() || '';
+            fixes.push(`Added default attribute ${attrDecl.name}="${attrDecl.defaultValue}" to <${elLocal}>.`);
+            diffItems.push({
+              code: 'FIX_XSD_DEFAULT_ATTR',
+              category: 'schema-violation',
+              classification: 'safe-automatic',
+              confidence: 'high',
+              description: `Added missing attribute ${attrDecl.name}="${attrDecl.defaultValue}" specified with default value in schema.`,
+            });
+          }
+        }
+
+        // Element sequence ordering & tag casing
+        if (typeDef.compositor) {
+          const comp = typeDef.compositor;
+          const childElements = Array.from(el.children);
+
+          // Tag casing repair: check if a child's name matches an element in compositor case-insensitively
+          for (const child of childElements) {
+            const childName = child.localName || child.nodeName.split(':').pop() || '';
+            const matchingDecl = comp.elements.find(
+              (decl) => decl.name.toLowerCase() === childName.toLowerCase() && decl.name !== childName
+            );
+            if (matchingDecl) {
+              try {
+                const correctedEl = xmlDoc.createElementNS(child.namespaceURI, matchingDecl.name);
+                while (child.firstChild) {
+                  correctedEl.appendChild(child.firstChild);
+                }
+                for (const attr of Array.from(child.attributes)) {
+                  correctedEl.setAttribute(attr.name, attr.value);
+                }
+                el.replaceChild(correctedEl, child);
+                docModified = true;
+                fixes.push(`Corrected tag casing <${childName}> to <${matchingDecl.name}> matching schema definition.`);
+                diffItems.push({
+                  code: 'FIX_XSD_TAG_CASING',
+                  category: 'schema-violation',
+                  classification: 'safe-automatic',
+                  confidence: 'high',
+                  description: `Adjusted element casing from <${childName}> to <${matchingDecl.name}> to match schema.`,
+                });
+              } catch {
+                // Ignore replacement failure
+              }
+            }
+          }
+
+          // Sequence reordering: if comp.kind === 'sequence', check if children are out of order
+          if (comp.kind === 'sequence') {
+            const currentChildren = Array.from(el.children);
+            const declNamesOrder = comp.elements.map((e) => e.name);
+
+            let isOutOfOrder = false;
+            let lastIdx = -1;
+            for (const c of currentChildren) {
+              const cName = c.localName || c.nodeName.split(':').pop() || '';
+              const declIdx = declNamesOrder.indexOf(cName);
+              if (declIdx >= 0) {
+                if (declIdx < lastIdx) {
+                  isOutOfOrder = true;
+                  break;
+                }
+                lastIdx = declIdx;
+              }
+            }
+
+            if (isOutOfOrder) {
+              const sortedChildren = [...currentChildren].sort((a, b) => {
+                const aName = a.localName || a.nodeName.split(':').pop() || '';
+                const bName = b.localName || b.nodeName.split(':').pop() || '';
+                const aIdx = declNamesOrder.indexOf(aName);
+                const bIdx = declNamesOrder.indexOf(bName);
+                if (aIdx >= 0 && bIdx >= 0) return aIdx - bIdx;
+                if (aIdx >= 0) return -1;
+                if (bIdx >= 0) return 1;
+                return 0;
+              });
+
+              for (const sc of sortedChildren) {
+                el.appendChild(sc);
+              }
+              docModified = true;
+              const elLocal = el.localName || el.nodeName.split(':').pop() || '';
+              fixes.push(`Reordered child elements under <${elLocal}> according to schema xs:sequence order.`);
+              diffItems.push({
+                code: 'FIX_XSD_SEQUENCE_ORDER',
+                category: 'schema-violation',
+                classification: 'safe-automatic',
+                confidence: 'high',
+                description: `Reordered child elements under <${elLocal}> to conform to schema xs:sequence definition.`,
+              });
+            }
+          }
+
+          // Recurse into children
+          for (const c of Array.from(el.children)) {
+            const cName = c.localName || c.nodeName.split(':').pop() || '';
+            const decl = comp.elements.find((e) => e.name === cName);
+            let childTypeName = decl?.type || '';
+
+            // Look up inline type
+            const inlineKey = `__inline_${typeName.replace('__inline_', '')}_${cName}`;
+            if (schema.types.has(inlineKey)) {
+              childTypeName = inlineKey;
+            } else if (!childTypeName && schema.types.has(`__inline_${cName}`)) {
+              childTypeName = `__inline_${cName}`;
+            }
+
+            if (childTypeName) {
+              repairElementWithSchema(c, childTypeName);
+            }
+          }
+        }
+      }
+
+      // Run recursive repair starting from root
+      const matchedTop = schema.topElements.get(rootLocal);
+      if (matchedTop) {
+        repairElementWithSchema(root, matchedTop.type);
+      }
+
+      if (docModified) {
+        const serializer = new XMLSerializer();
+        let serialized = serializer.serializeToString(xmlDoc);
+
+        const originalDeclMatch = currentXml.match(/^\s*(<\?xml[^>]*\?>)/);
+        if (originalDeclMatch && !serialized.trimStart().startsWith('<?xml')) {
+          serialized = `${originalDeclMatch[1]}\n${serialized}`;
+        }
+
+        // Guarantee xmlns is present on root tag if schema targetNamespace was configured
+        if (schema.targetNamespace && !serialized.includes(`xmlns="${schema.targetNamespace}"`)) {
+          serialized = serialized.replace(
+            new RegExp(`(<${rootLocal}\\b)([^>]*)>`),
+            `$1 xmlns="${schema.targetNamespace}"$2>`
+          );
+        }
+
+        currentXml = serialized;
+      }
+    }
+  } catch {
+    // If DOM modification fails, keep currentXml safely
+  }
+
+  // Pass 4: Final Revalidation Against XSD
+  const finalValidation = validateAgainstXsd(currentXml, xsd);
+  const finalValid = finalValidation.isValid;
+
+  // Pass 5: Classify Unresolved Issues (Confirmation Required vs Diagnosis Only)
+  const unresolvedIssues: XmlValidationError[] = finalValidation.errors.map((err) => {
+    let classification: RepairClassification = 'diagnosis-only';
+
+    if (err.code === 'ERR_XSD_FACET_VIOLATION' || err.code === 'ERR_XSD_TYPE_MISMATCH') {
+      classification = 'confirmation-required';
+    } else if (err.code === 'ERR_XSD_CHOICE_MUTEX') {
+      classification = 'confirmation-required';
+    } else if (err.code === 'ERR_XSD_UNIQUE_DUPLICATE' || err.code === 'ERR_XSD_KEY_DUPLICATE') {
+      classification = 'confirmation-required';
+    } else if (err.code === 'ERR_XSD_ELEMENT_MISSING' || err.code === 'ERR_XSD_ATTR_REQUIRED') {
+      classification = 'diagnosis-only';
+    }
+
+    return {
+      ...err,
+      classification,
+    };
+  });
+
+  return {
+    fixedXml: currentXml,
+    fixes: Array.from(new Set(fixes)),
+    report: {
+      originalValid,
+      finalValid,
+      totalPasses: fixes.length > 0 ? 2 : 1,
+      fixes: diffItems,
+      unresolvedIssues,
+      securityWarnings: syntaxRepair.report.securityWarnings,
+      executionTimeMs: Math.round(performance.now() - startTime),
+    },
   };
 }
 
@@ -2512,7 +3972,7 @@ export const SAP_ERR_MULTIPLE_ROOTS = `<?xml version="1.0" encoding="UTF-8"?>
 </OrderHeader>`;
 
 export const SAMPLE_SAP_XSD = `<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://tool-sap.dev/orders/v1" xmlns="http://tool-sap.dev/orders/v1" elementFormDefault="qualified">
   <xs:element name="OrderRequest">
     <xs:complexType>
       <xs:sequence>
@@ -2521,6 +3981,7 @@ export const SAMPLE_SAP_XSD = `<?xml version="1.0" encoding="UTF-8"?>
             <xs:sequence>
               <xs:element name="OrderNumber" type="xs:string" />
               <xs:element name="SupplierName" type="xs:string" />
+              <xs:element name="BillingAddress" type="xs:string" minOccurs="0" />
               <xs:element name="OrderDate" type="xs:date" minOccurs="0" />
             </xs:sequence>
           </xs:complexType>
@@ -2532,9 +3993,10 @@ export const SAMPLE_SAP_XSD = `<?xml version="1.0" encoding="UTF-8"?>
                 <xs:complexType>
                   <xs:sequence>
                     <xs:element name="Description" type="xs:string" />
-                    <xs:element name="Quantity" type="xs:integer" />
+                    <xs:element name="Quantity" type="xs:integer" minOccurs="0" />
                     <xs:element name="Price" type="xs:decimal" />
                   </xs:sequence>
+                  <xs:attribute name="id" type="xs:string" use="optional" />
                 </xs:complexType>
               </xs:element>
             </xs:sequence>

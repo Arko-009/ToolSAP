@@ -19,6 +19,7 @@ import {
   Zap,
   HelpCircle,
   Trash2,
+  X,
 } from 'lucide-react';
 import { SEOHead } from '@/components/common/SEOHead';
 import { Button } from '@/components/ui/Button';
@@ -31,6 +32,7 @@ import {
   validateXmlStructure,
   autoFixXml,
   validateAgainstXsd,
+  autoFixXmlWithXsd,
   type XmlValidationDiagnostic,
   type XsdValidationResult,
   type AutoFixReport,
@@ -85,6 +87,16 @@ export function XmlValidatorPage() {
     runValidation(inputXml, inputXsd, validationMode);
   }, [inputXml, inputXsd, validationMode, runValidation]);
 
+  // Expose automated test suite for browser verification in development
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      import('@/utils/xml/xmlValidator.testSuite').then((mod) => {
+        (window as unknown as { __runXmlValidatorTestSuite?: () => unknown }).__runXmlValidatorTestSuite =
+          mod.runXmlValidatorTestSuite;
+      });
+    }
+  }, []);
+
   // Handle Auto-Fix
   const handleAutoFix = () => {
     if (!inputXml.trim()) return;
@@ -108,6 +120,63 @@ export function XmlValidatorPage() {
     });
   };
 
+  // Dedicated Validate with XSD Pipeline (Validation + Schema-Guided Auto-Repair)
+  const handleValidateWithXsd = () => {
+    if (!inputXml.trim()) {
+      addToast({
+        type: 'error',
+        title: 'Input XML is empty',
+        description: 'Please paste or upload an XML document to validate.',
+      });
+      return;
+    }
+    if (!inputXsd.trim()) {
+      addToast({
+        type: 'error',
+        title: 'XSD Schema is empty',
+        description: 'Please provide an XSD schema definition in the schema tab.',
+      });
+      return;
+    }
+
+    // Execute full 5-stage validation and repair pipeline
+    const { fixedXml, fixes, report } = autoFixXmlWithXsd(inputXml, inputXsd);
+    setLastFixReport(report);
+
+    if (fixes.length > 0) {
+      setInputXml(fixedXml);
+      const schemaRes = validateAgainstXsd(fixedXml, inputXsd);
+      setXsdResult(schemaRes);
+      setDiagnostic(validateXmlStructure(fixedXml));
+
+      addToast({
+        type: report.finalValid ? 'success' : 'info',
+        title: report.finalValid ? 'Validated & Repaired with XSD' : 'Partially Repaired with XSD',
+        description: report.finalValid
+          ? `Repaired ${fixes.length} issue(s) to conform with XSD schema rules.`
+          : `Applied ${fixes.length} safe fix(es). Some issues require manual confirmation.`,
+      });
+    } else {
+      const schemaRes = validateAgainstXsd(inputXml, inputXsd);
+      setXsdResult(schemaRes);
+      setDiagnostic(validateXmlStructure(inputXml));
+
+      if (schemaRes.isValid) {
+        addToast({
+          type: 'success',
+          title: 'Valid XML & Schema Match',
+          description: 'Document is structurally well-formed and conforms to the provided XSD schema rules.',
+        });
+      } else {
+        addToast({
+          type: 'warning',
+          title: 'XSD Validation Completed',
+          description: `${schemaRes.errors.length} schema violation(s) detected. Check diagnostics below.`,
+        });
+      }
+    }
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // File Upload
@@ -128,6 +197,7 @@ export function XmlValidatorPage() {
     reader.onload = (event) => {
       const text = event.target?.result as string;
       setInputXml(text);
+      setLastFixReport(null);
       setActiveFileName(file.name);
       addToast({
         type: 'success',
@@ -143,6 +213,7 @@ export function XmlValidatorPage() {
   const handleClear = () => {
     if (!inputXml && !activeFileName) return;
     setInputXml('');
+    setLastFixReport(null);
     setActiveFileName(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -206,6 +277,7 @@ export function XmlValidatorPage() {
     reader.onload = (event) => {
       const text = event.target?.result as string;
       setInputXml(text);
+      setLastFixReport(null);
       setActiveFileName(file.name);
       addToast({
         type: 'success',
@@ -236,17 +308,17 @@ export function XmlValidatorPage() {
   return (
     <>
       <SEOHead
-        title="XML Validator — Validate XML & XSD Schemas Online | ToolSAP"
-        description="Free online XML validator for SAP developers. Check XML well-formedness, validate SOAP and IDoc structures, line-by-line syntax error diagnostics, 100% in-browser privacy."
+        title="Free XML Validator Online | ToolSAP"
+        description="Validate XML syntax, find errors with line numbers, and check XML against an XSD schema using ToolSAP’s free online XML Validator."
         canonical="/tools/xml-validator"
         keywords={[
+          'free xml validator online',
           'xml validator',
-          'validate xml',
+          'validate xml online',
           'xml syntax checker',
           'sap xml validator',
-          'cpi xml validator',
-          'xml well-formedness',
           'xsd validator online',
+          'cpi xml validator',
           'toolsap',
         ]}
       />
@@ -258,10 +330,10 @@ export function XmlValidatorPage() {
           __html: JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'WebApplication',
-            name: 'ToolSAP XML Validator',
+            name: 'Free XML Validator Online | ToolSAP',
             url: 'https://tool-sap.vercel.app/tools/xml-validator',
             description:
-              'Free in-browser XML syntax validator and XSD schema checker for SAP Integration Suite and CPI developers.',
+              'Validate XML syntax, find errors with line numbers, and check XML against an XSD schema using ToolSAP’s free online XML Validator.',
             applicationCategory: 'DeveloperApplication',
             operatingSystem: 'All',
             offers: {
@@ -367,24 +439,50 @@ export function XmlValidatorPage() {
 
             {/* Right: Action Buttons */}
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="primary"
-                size="sm"
-                icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-                onClick={() => runValidation()}
-              >
-                Re-Validate
-              </Button>
+              {validationMode === 'xsd' ? (
+                <>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={<FileCheck2 className="h-3.5 w-3.5 text-white" />}
+                    onClick={handleValidateWithXsd}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs font-bold"
+                  >
+                    Validate with XSD
+                  </Button>
 
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={<Sparkles className="h-3.5 w-3.5 text-amber-500" />}
-                onClick={handleAutoFix}
-                title="Auto-escape bare ampersands, fix BOM, clean quotes"
-              >
-                Auto-Fix Common Errors
-              </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<Sparkles className="h-3.5 w-3.5 text-emerald-600" />}
+                    onClick={handleValidateWithXsd}
+                    title="Auto-repair schema violations, sequence ordering, and namespaces"
+                  >
+                    Auto-Fix with XSD
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+                    onClick={() => runValidation()}
+                  >
+                    Re-Validate
+                  </Button>
+
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<Sparkles className="h-3.5 w-3.5 text-amber-500" />}
+                    onClick={handleAutoFix}
+                    title="Auto-escape bare ampersands, fix BOM, clean quotes"
+                  >
+                    Auto-Fix Common Errors
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         }
@@ -484,7 +582,10 @@ export function XmlValidatorPage() {
               {validationMode === 'xsd' && activeTab === 'xsd' ? (
                 <CodeEditor
                   value={inputXsd}
-                  onChange={(val) => setInputXsd(val)}
+                  onChange={(val) => {
+                    setInputXsd(val);
+                    setLastFixReport(null);
+                  }}
                   placeholder="Paste or type XSD Schema (<xs:schema>)..."
                   height="100%"
                   minHeight="100%"
@@ -492,7 +593,10 @@ export function XmlValidatorPage() {
               ) : (
                 <CodeEditor
                   value={inputXml}
-                  onChange={(val) => setInputXml(val)}
+                  onChange={(val) => {
+                    setInputXml(val);
+                    setLastFixReport(null);
+                  }}
                   placeholder="Paste or upload XML payload to validate..."
                   hasError={!isInputEmpty && !isActuallyValid}
                   height="100%"
@@ -542,17 +646,21 @@ export function XmlValidatorPage() {
                   </Badge>
                 ) : isActuallyValid ? (
                   <Badge variant="success" size="sm" dot>
-                    PASS · Valid XML
+                    {validationMode === 'xsd' ? 'PASS · Valid XML & Schema Match' : 'PASS · Valid XML'}
                   </Badge>
                 ) : (
                   <Button
                     variant="primary"
                     size="sm"
                     icon={<Sparkles className="h-3.5 w-3.5" />}
-                    onClick={handleAutoFix}
-                    className="bg-rose-600 hover:bg-rose-700 text-white shadow-2xs"
+                    onClick={validationMode === 'xsd' ? handleValidateWithXsd : handleAutoFix}
+                    className={
+                      validationMode === 'xsd'
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs font-bold'
+                        : 'bg-rose-600 hover:bg-rose-700 text-white shadow-2xs'
+                    }
                   >
-                    Auto-Fix with ToolSAP
+                    {validationMode === 'xsd' ? 'Auto-Fix with XSD' : 'Auto-Fix with ToolSAP'}
                   </Button>
                 )}
               </div>
@@ -595,9 +703,19 @@ export function XmlValidatorPage() {
                             </p>
                           </div>
                         </div>
-                        <Badge variant="primary" size="sm">
-                          {lastFixReport.finalValid ? 'REPAIRED & VERIFIED' : 'PARTIALLY REPAIRED'}
-                        </Badge>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="primary" size="sm">
+                            {isActuallyValid || lastFixReport.finalValid ? 'REPAIRED & VERIFIED' : 'PARTIALLY REPAIRED'}
+                          </Badge>
+                          <button
+                            type="button"
+                            onClick={() => setLastFixReport(null)}
+                            className="p-1 rounded-md text-indigo-400 hover:text-indigo-700 hover:bg-indigo-100/50 transition-colors cursor-pointer"
+                            title="Dismiss audit report"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Security Warnings if any */}
@@ -664,6 +782,53 @@ export function XmlValidatorPage() {
                           </div>
                         ))}
                       </div>
+
+                      {/* Unresolved / Confirmation Required Issues */}
+                      {!isActuallyValid && lastFixReport.unresolvedIssues && lastFixReport.unresolvedIssues.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-indigo-200/70">
+                          <div className="text-[11px] font-bold text-amber-950 mb-2 flex items-center gap-1.5">
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                            <span>
+                              {lastFixReport.unresolvedIssues.some((i) => i.classification === 'confirmation-required')
+                                ? 'Issues Requiring User Confirmation (Preserving Business Data)'
+                                : 'Unresolved Issues Requiring Manual Action'} ({lastFixReport.unresolvedIssues.length})
+                            </span>
+                          </div>
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                            {lastFixReport.unresolvedIssues.map((issue, iIdx) => (
+                              <div
+                                key={iIdx}
+                                className="p-2 rounded-lg bg-white/90 border border-amber-200/80 text-xs shadow-2xs"
+                              >
+                                <div className="flex items-center justify-between gap-1 flex-wrap">
+                                  <span className="font-mono text-[10px] font-bold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded">
+                                    {issue.code || 'SCHEMA_VIOLATION'}
+                                  </span>
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                      issue.classification === 'confirmation-required'
+                                        ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                        : 'bg-purple-100 text-purple-800 border border-purple-200'
+                                    }`}
+                                  >
+                                    {issue.classification === 'confirmation-required'
+                                      ? 'Confirmation Required'
+                                      : 'Diagnosis Only'}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-neutral-800 mt-1 font-mono">
+                                  {issue.message}
+                                </p>
+                                {issue.suggestion && (
+                                  <p className="text-[10px] text-amber-800 mt-1 bg-amber-50/80 p-1.5 rounded border border-amber-100">
+                                    <strong>Recommendation:</strong> {issue.suggestion}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </Card>
                   )}
 
@@ -711,10 +876,19 @@ export function XmlValidatorPage() {
                         <div className="flex items-center justify-between p-3.5 rounded-xl bg-rose-100/80 border border-rose-200 text-rose-950 text-xs font-semibold shadow-2xs">
                           <div className="flex items-center gap-2">
                             <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-                            <span>{activeErrors.length} Syntax Mistakes Detected</span>
+                            <span>
+                              {activeErrors.length}{' '}
+                              {validationMode === 'xsd'
+                                ? activeErrors.length > 1
+                                  ? 'Schema Violations Detected'
+                                  : 'Schema Violation Detected'
+                                : activeErrors.length > 1
+                                ? 'Syntax Mistakes Detected'
+                                : 'Syntax Mistake Detected'}
+                            </span>
                           </div>
                           <span className="text-[11px] font-mono text-rose-800 bg-white/90 px-2.5 py-0.5 rounded-md border border-rose-200">
-                            All mistakes listed below
+                            {validationMode === 'xsd' ? 'All schema violations listed below' : 'All mistakes listed below'}
                           </span>
                         </div>
                       )}
@@ -728,7 +902,19 @@ export function XmlValidatorPage() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between gap-2">
                                 <h3 className="text-base font-bold text-rose-950">
-                                  {activeErrors.length > 1
+                                  {err.source === 'xsd' || err.code === 'ERR_XSD_COMPILATION'
+                                    ? activeErrors.length > 1
+                                      ? `Schema Error #${errIdx + 1}: XSD Syntax Issue`
+                                      : 'XSD Schema Syntax Issue'
+                                    : err.category === 'schema-violation' || err.code?.startsWith('ERR_XSD_')
+                                    ? activeErrors.length > 1
+                                      ? `Violation #${errIdx + 1}: Schema Constraint`
+                                      : 'Schema Constraint Violation'
+                                    : err.category === 'namespace'
+                                    ? activeErrors.length > 1
+                                      ? `Violation #${errIdx + 1}: Namespace Mismatch`
+                                      : 'Namespace Mismatch'
+                                    : activeErrors.length > 1
                                     ? `Mistake #${errIdx + 1}: Syntax Error`
                                     : 'Syntax Error Detected'}
                                 </h3>

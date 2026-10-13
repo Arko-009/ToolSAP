@@ -3314,3 +3314,62 @@ img {
 .capsule-btn-emerald:active .capsule-inspect-arrow {
   color: #ffffff;
 }
+
+/* ============================================================
+   TOOLSAP 404 EXPERIENCE ANIMATIONS
+   ============================================================ */
+
+@keyframes glitch {
+  0% {
+    transform: translate(0);
+    text-shadow: -2px 0 #38bdf8, 2px 0 #f43f5e;
+  }
+  20% {
+    transform: translate(-3px, 2px);
+    text-shadow: 3px 0 #38bdf8, -2px 0 #f43f5e;
+  }
+  40% {
+    transform: translate(2px, -2px);
+    text-shadow: -2px 0 #38bdf8, 2px 0 #f43f5e;
+  }
+  60% {
+    transform: translate(-2px, -1px);
+    text-shadow: 2px 0 #38bdf8, -3px 0 #f43f5e;
+  }
+  80% {
+    transform: translate(1px, 2px);
+    text-shadow: -1px 0 #38bdf8, 2px 0 #f43f5e;
+  }
+  100% {
+    transform: translate(0);
+    text-shadow: -2px 0 #38bdf8, 2px 0 #f43f5e;
+  }
+}
+
+.animate-glitch {
+  animation: glitch 0.25s infinite linear;
+}
+
+@keyframes scaleUp {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-scale-up {
+  animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}

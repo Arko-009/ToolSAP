@@ -11,6 +11,7 @@ const LearningHubPage = lazy(() => import('@/pages/LearningHubPage').then((m) =>
 const ToolsPage = lazy(() => import('@/pages/ToolsPage').then((m) => ({ default: m.ToolsPage })));
 const XmlFormatterPage = lazy(() => import('@/pages/XmlFormatterPage').then((m) => ({ default: m.XmlFormatterPage })));
 const XmlValidatorPage = lazy(() => import('@/pages/XmlValidatorPage').then((m) => ({ default: m.XmlValidatorPage })));
+const XmlToXsdPage = lazy(() => import('@/pages/XmlToXsdPage').then((m) => ({ default: m.XmlToXsdPage })));
 const AboutPage = lazy(() => import('@/pages/AboutPage').then((m) => ({ default: m.AboutPage })));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
@@ -74,6 +75,14 @@ export function App() {
                 }
               />
               <Route
+                path="tools/xml-to-xsd"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <XmlToXsdPage />
+                  </Suspense>
+                }
+              />
+              <Route
                 path="about"
                 element={
                   <Suspense fallback={<PageLoader />}>
@@ -81,15 +90,15 @@ export function App() {
                   </Suspense>
                 }
               />
-              <Route
-                path="*"
-                element={
-                  <Suspense fallback={<PageLoader />}>
-                    <NotFoundPage />
-                  </Suspense>
-                }
-              />
             </Route>
+            <Route
+              path="*"
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <NotFoundPage />
+                </Suspense>
+              }
+            />
           </Routes>
         </BrowserRouter>
       </ToastProvider>

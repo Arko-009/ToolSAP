@@ -10,17 +10,20 @@ export function HomePage() {
   return (
     <>
       <SEOHead
-        title="ToolSAP — Learn SAP. Build Faster. Solve Problems."
-        description="A modern, developer-first platform for SAP developers. Master SAP Integration Suite with structured, practical lessons and free client-side developer utilities."
+        title="ToolSAP — SAP Tools & Learning"
+        description="Explore free SAP developer tools and practical SAP learning resources to build skills and solve problems faster."
         canonical="/"
         keywords={[
-          'SAP learning',
+          'ToolSAP',
+          'toolsap',
+          'tool sap',
           'SAP developer tools',
+          'SAP learning',
           'SAP Integration Suite',
           'SAP Cloud Integration',
           'CPI Groovy script',
           'SAP XML formatter',
-          'SAP XSD validator',
+          'SAP XML validator',
         ]}
       />
 

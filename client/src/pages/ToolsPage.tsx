@@ -7,7 +7,6 @@ import {
   ArrowLeftRight,
   Search,
   Wand2,
-  Shield,
   ArrowRight,
   Terminal,
   Binary,
@@ -56,12 +55,7 @@ export function ToolsPage() {
           { label: 'Home', href: '/' },
           { label: 'Tools' },
         ]}
-        badge={
-          <Badge variant="success" size="md">
-            <Shield className="h-3 w-3 mr-1" />
-            Privacy-First
-          </Badge>
-        }
+        align="center"
       />
 
       <Section padding="lg">

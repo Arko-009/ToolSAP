@@ -2,6 +2,7 @@ import { BookOpen, Layers, GitBranch, Cpu, ShieldCheck } from 'lucide-react';
 import { Container } from '@/components/layout/Container';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
 import { CapsuleButton } from '@/components/common/CapsuleButton';
+import { RippleButton } from '@/components/ui/RippleButton';
 
 const curriculumTracks = [
   {
@@ -116,6 +117,15 @@ export function CurriculumSection() {
               </div>
             );
           })}
+        </div>
+
+        {/* Load More Modules Action */}
+        <div className="mt-10 sm:mt-12">
+          <RippleButton
+            to="/learning"
+            text="Load more Modules"
+            variant="emerald"
+          />
         </div>
       </Container>
     </section>

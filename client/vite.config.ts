@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { seoPrerenderPlugin } from './plugins/vite-plugin-seo-prerender.ts';
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), seoPrerenderPlugin()],
   resolve: {
     alias: {
       '@': `${import.meta.dirname}/src`,

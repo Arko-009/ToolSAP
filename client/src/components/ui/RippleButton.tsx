@@ -9,6 +9,7 @@ export interface RippleButtonProps {
   text?: string;
   className?: string;
   circleColor?: string;
+  variant?: 'blue' | 'emerald';
 }
 
 interface Ripple {
@@ -23,9 +24,14 @@ export function RippleButton({
   onClick,
   text = 'Load More Tools',
   className = '',
-  circleColor = 'rgba(37, 99, 235, 0.22)',
+  circleColor,
+  variant = 'blue',
 }: RippleButtonProps) {
   const [ripples, setRipples] = useState<Ripple[]>([]);
+
+  const defaultCircleColor =
+    circleColor ||
+    (variant === 'emerald' ? 'rgba(16, 185, 129, 0.22)' : 'rgba(37, 99, 235, 0.22)');
 
   const handlePointerDown = (e: React.MouseEvent<HTMLElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -69,7 +75,7 @@ export function RippleButton({
               left: ripple.x,
               width: ripple.size,
               height: ripple.size,
-              backgroundColor: circleColor,
+              backgroundColor: defaultCircleColor,
             }}
             aria-hidden="true"
           />
@@ -84,8 +90,13 @@ export function RippleButton({
     </>
   );
 
+  const hoverColorClass =
+    variant === 'emerald'
+      ? 'hover:border-emerald-300 hover:text-emerald-600'
+      : 'hover:border-neutral-400 hover:text-primary-600';
+
   const baseClasses =
-    'relative group inline-flex items-center justify-center px-8 py-3.5 text-sm sm:text-base font-semibold text-neutral-800 bg-white border border-neutral-300/80 rounded-xl shadow-xs hover:border-neutral-400 hover:bg-neutral-50/80 hover:text-primary-600 active:scale-[0.98] transition-all duration-150 overflow-hidden select-none cursor-pointer';
+    `relative group inline-flex items-center justify-center px-8 py-3.5 text-sm sm:text-base font-semibold text-neutral-800 bg-white border border-neutral-300/80 rounded-xl shadow-xs hover:bg-neutral-50/80 ${hoverColorClass} active:scale-[0.98] transition-all duration-150 overflow-hidden select-none cursor-pointer`;
 
   return (
     <div className={`flex justify-center ${className}`}>

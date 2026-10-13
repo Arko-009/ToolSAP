@@ -34,9 +34,9 @@ export const tools: Tool[] = [
     relatedTools: ['xml-formatter', 'xml-to-xsd'],
     features: ['Well-formedness check', 'XSD schema validation', 'Line & column diagnostics', 'Auto-fix common errors', 'SAP IDoc & SOAP samples', '100% In-browser privacy'],
     seo: {
-      title: 'XML Validator — Validate XML & XSD Schemas Online | ToolSAP',
-      description: 'Free online XML validator for SAP developers. Check XML well-formedness and validate against XSD schemas for SAP integration development.',
-      keywords: ['xml validator', 'validate xml', 'xml schema validation', 'sap xml', 'cpi xml validator'],
+      title: 'Free XML Validator Online | ToolSAP',
+      description: 'Validate XML syntax, find errors with line numbers, and check XML against an XSD schema using ToolSAP’s free online XML Validator.',
+      keywords: ['free xml validator online', 'xml validator', 'validate xml', 'xml syntax checker', 'sap xml validator', 'xsd validator online', 'cpi xml validator', 'toolsap'],
     },
   },
   {
@@ -47,11 +47,11 @@ export const tools: Tool[] = [
     description: 'Generate XSD schemas from XML samples. Quickly create message schemas for SAP Cloud Integration message mappings and transformations.',
     shortDescription: 'Generate XSD schemas from XML samples.',
     icon: 'FileOutput',
-    status: 'coming-soon',
+    status: 'available',
     priority: 'p0',
     relatedLessons: ['message-mapping', 'message-transformation'],
     relatedTools: ['xml-formatter', 'xml-validator'],
-    features: ['Auto-generate XSD', 'Type inference', 'Configurable options', 'Download schema'],
+    features: ['Auto-generate XSD', 'Conservative type inference', 'Sibling union merging', '100% In-browser privacy'],
     seo: {
       title: 'XML to XSD Generator — Generate Schemas Online | ToolSAP',
       description: 'Generate XSD schemas from XML samples automatically. Create message schemas for SAP Integration Suite mappings.',

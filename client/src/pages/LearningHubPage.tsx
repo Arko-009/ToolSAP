@@ -56,6 +56,7 @@ export function LearningHubPage() {
           { label: 'Home', href: '/' },
           { label: 'Learning' },
         ]}
+        align="center"
       />
 
       <Section padding="lg">

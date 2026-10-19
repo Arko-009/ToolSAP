@@ -1,6 +1,9 @@
 import { useMemo } from 'react';
 import CodeMirror, { type ReactCodeMirrorProps } from '@uiw/react-codemirror';
 import { xml } from '@codemirror/lang-xml';
+import { json } from '@codemirror/lang-json';
+import { StreamLanguage } from '@codemirror/language';
+import { groovy } from '@codemirror/legacy-modes/mode/groovy';
 import { EditorView } from '@codemirror/view';
 
 export interface CodeEditorProps {
@@ -11,7 +14,7 @@ export interface CodeEditorProps {
   height?: string;
   minHeight?: string;
   maxHeight?: string;
-  language?: 'xml';
+  language?: 'xml' | 'json' | 'groovy' | 'text';
   className?: string;
   hasError?: boolean;
 }
@@ -70,10 +73,15 @@ const editorTheme = EditorView.theme({
   '.cm-selectionBackground, ::selection': {
     backgroundColor: '#fed7aa !important',
   },
-  // XML Token Highlighting
+  // Token Highlighting across XML, JSON & Groovy
+  '.cm-keyword': { color: '#7c3aed', fontWeight: '600' },
+  '.cm-def': { color: '#2563eb', fontWeight: '600' },
+  '.cm-variable, .cm-variable-2': { color: '#0f172a' },
+  '.cm-property': { color: '#0284c7' },
+  '.cm-number': { color: '#ea580c' },
   '.cm-tag': { color: '#2563eb', fontWeight: '500' },
   '.cm-attribute': { color: '#0284c7' },
-  '.cm-attribute-value, .cm-string': { color: '#059669' },
+  '.cm-attribute-value, .cm-string, .cm-string-2': { color: '#059669' },
   '.cm-comment': { color: '#64748b', fontStyle: 'italic' },
   '.cm-meta, .cm-processingInstruction': { color: '#7c3aed' },
   '.cm-cdata': { color: '#d97706', fontWeight: '500' },
@@ -84,7 +92,7 @@ export function CodeEditor({
   value,
   onChange,
   readOnly = false,
-  placeholder = 'Paste or type XML here...',
+  placeholder = 'Paste or type code here...',
   height = '100%',
   minHeight = '380px',
   maxHeight,
@@ -100,6 +108,10 @@ export function CodeEditor({
 
     if (language === 'xml') {
       list.push(xml());
+    } else if (language === 'json') {
+      list.push(json());
+    } else if (language === 'groovy') {
+      list.push(StreamLanguage.define(groovy));
     }
 
     return list;

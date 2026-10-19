@@ -151,6 +151,24 @@ export function mergeSimpleTypes(t1: string, t2: string): string {
   return 'xs:string';
 }
 
+/**
+ * Determines whether a given namespace URI is foreign relative to the current target namespace.
+ */
+export function isForeignNamespace(
+  itemNs: string | null | undefined,
+  currentTargetNs: string | null
+): boolean {
+  if (!itemNs) return false;
+  if (itemNs === 'http://www.w3.org/2001/XMLSchema') return false;
+  if (itemNs === 'http://www.w3.org/2001/XMLSchema-instance') return false;
+  if (itemNs === 'http://www.w3.org/XML/1998/namespace') return false;
+  if (!currentTargetNs) {
+    // Current schema has no targetNamespace, so any element or attribute WITH a namespace URI is foreign
+    return true;
+  }
+  return itemNs !== currentTargetNs;
+}
+
 /** Internal schema node representation for element tree analysis */
 interface ElementAnalysisNode {
   name: string;
@@ -163,9 +181,15 @@ interface ElementAnalysisNode {
   childrenMap: Map<string, ElementAnalysisNode>;
   childrenOrder: string[];
 
+  // Order variation and conflict tracking
+  observedChildSequences: string[][];
+  hasOrderConflict: boolean;
+  hasAnyRepeatedChild: boolean;
+
   // Occurrence tracking
   maxOccurrencesInParent: number;
   totalInstancesObserved: number;
+  parentInstancesPresentCount: number;
 
   // Attributes
   attributesMap: Map<
@@ -206,8 +230,12 @@ function createAnalysisNode(
     isRoot,
     childrenMap: new Map(),
     childrenOrder: [],
+    observedChildSequences: [],
+    hasOrderConflict: false,
+    hasAnyRepeatedChild: false,
     maxOccurrencesInParent: 1,
     totalInstancesObserved: 0,
+    parentInstancesPresentCount: 0,
     attributesMap: new Map(),
     textValues: [],
     hasChildElements: false,
@@ -218,44 +246,126 @@ function createAnalysisNode(
 }
 
 /**
- * Merges a newly observed sequence of child element keys into the existing childrenOrder,
- * preserving relative topological sequence order across sibling instances.
+ * Detects whether observed child element sequences contain order conflicts (cycles / non-contiguous repeats),
+ * or whether a consistent topological sequence exists across all observed parent instances.
  */
-function mergeChildOrder(existingOrder: string[], newSequence: string[]): string[] {
-  const result = [...existingOrder];
-  let lastIndex = -1;
+function resolveChildOrderAndCompositor(node: ElementAnalysisNode): {
+  hasConflict: boolean;
+  hasRepeated: boolean;
+  order: string[];
+} {
+  const allKeys = Array.from(node.childrenMap.keys());
+  const hasRepeated = Array.from(node.childrenMap.values()).some((c) => c.maxOccurrencesInParent > 1);
 
-  for (let i = 0; i < newSequence.length; i++) {
-    const key = newSequence[i];
-    const existingIndex = result.indexOf(key);
+  if (allKeys.length <= 1) {
+    return {
+      hasConflict: false,
+      hasRepeated,
+      order: allKeys,
+    };
+  }
 
-    if (existingIndex !== -1) {
-      lastIndex = existingIndex;
-    } else {
-      // Look ahead in newSequence to find the next item that is already in result
-      let insertIndex = -1;
-      for (let j = i + 1; j < newSequence.length; j++) {
-        const nextIdx = result.indexOf(newSequence[j]);
-        if (nextIdx !== -1) {
-          insertIndex = nextIdx;
-          break;
+  // Check if any child occurred non-contiguously in a single sequence: e.g. [A, B, A]
+  for (const seq of node.observedChildSequences) {
+    const seenIndices = new Map<string, number>();
+    for (let i = 0; i < seq.length; i++) {
+      const key = seq[i];
+      if (seenIndices.has(key)) {
+        const lastIdx = seenIndices.get(key)!;
+        if (i > lastIdx + 1) {
+          // Key appeared, then another key, then this key again
+          return { hasConflict: true, hasRepeated: true, order: allKeys };
         }
       }
+      seenIndices.set(key, i);
+    }
+  }
 
-      if (insertIndex !== -1) {
-        result.splice(insertIndex, 0, key);
-        lastIndex = insertIndex;
-      } else if (lastIndex !== -1) {
-        result.splice(lastIndex + 1, 0, key);
-        lastIndex = lastIndex + 1;
-      } else {
-        result.push(key);
-        lastIndex = result.length - 1;
+  // Build directed graph of precedence: edge A -> B means A appeared before B
+  const adj = new Map<string, Set<string>>();
+  const inDegree = new Map<string, number>();
+
+  for (const k of allKeys) {
+    adj.set(k, new Set());
+    inDegree.set(k, 0);
+  }
+
+  for (const seq of node.observedChildSequences) {
+    for (let i = 0; i < seq.length; i++) {
+      for (let j = i + 1; j < seq.length; j++) {
+        const u = seq[i];
+        const v = seq[j];
+        if (u !== v) {
+          // If v -> u already exists, we have an immediate cycle / conflict
+          if (adj.get(v)?.has(u)) {
+            return { hasConflict: true, hasRepeated, order: allKeys };
+          }
+          if (!adj.get(u)!.has(v)) {
+            adj.get(u)!.add(v);
+          }
+        }
       }
     }
   }
 
-  return result;
+  // Recompute in-degrees
+  for (const [, neighbors] of adj) {
+    for (const v of neighbors) {
+      inDegree.set(v, (inDegree.get(v) || 0) + 1);
+    }
+  }
+
+  // Kahn's algorithm for topological sort
+  const queue: string[] = [];
+  for (const k of allKeys) {
+    if (inDegree.get(k) === 0) {
+      queue.push(k);
+    }
+  }
+
+  const topologicalOrder: string[] = [];
+  while (queue.length > 0) {
+    const u = queue.shift()!;
+    topologicalOrder.push(u);
+
+    for (const v of adj.get(u) || []) {
+      const newDeg = (inDegree.get(v) || 0) - 1;
+      inDegree.set(v, newDeg);
+      if (newDeg === 0) {
+        queue.push(v);
+      }
+    }
+  }
+
+  if (topologicalOrder.length === allKeys.length) {
+    return {
+      hasConflict: false,
+      hasRepeated,
+      order: topologicalOrder,
+    };
+  }
+
+  // Cycle detected in directed graph
+  return {
+    hasConflict: true,
+    hasRepeated,
+    order: allKeys,
+  };
+}
+
+/**
+ * Recursively resolves child order, detects order conflicts, and chooses compositors for each node.
+ */
+function finalizeNodeAnalysis(node: ElementAnalysisNode): void {
+  if (node.hasChildElements) {
+    const res = resolveChildOrderAndCompositor(node);
+    node.hasOrderConflict = res.hasConflict;
+    node.hasAnyRepeatedChild = res.hasRepeated;
+    node.childrenOrder = res.order;
+  }
+  for (const [, child] of node.childrenMap) {
+    finalizeNodeAnalysis(child);
+  }
 }
 
 /**
@@ -341,7 +451,8 @@ function analyzeElement(
 
   // 3. Analyze child elements and track occurrences among siblings
   const siblingCounts = new Map<string, number>();
-  const instanceChildSequence: string[] = [];
+  const instanceChildKeys: string[] = [];
+  const seenInThisInstance = new Set<string>();
 
   for (const childEl of childElements) {
     const childLocal = childEl.localName || childEl.nodeName.split(':').pop() || childEl.nodeName;
@@ -349,9 +460,7 @@ function analyzeElement(
     const childNs = childEl.namespaceURI || (childPrefix ? childEl.lookupNamespaceURI(childPrefix) : null);
     const childKey = childPrefix ? `${childPrefix}:${childLocal}` : childLocal;
 
-    if (!instanceChildSequence.includes(childKey)) {
-      instanceChildSequence.push(childKey);
-    }
+    instanceChildKeys.push(childKey);
 
     // Track sibling repetition count
     const currentCount = (siblingCounts.get(childKey) || 0) + 1;
@@ -363,6 +472,11 @@ function analyzeElement(
       node.childrenMap.set(childKey, childNode);
     }
 
+    if (!seenInThisInstance.has(childKey)) {
+      seenInThisInstance.add(childKey);
+      childNode.parentInstancesPresentCount++;
+    }
+
     // Update max occurrences in single parent
     if (currentCount > childNode.maxOccurrencesInParent) {
       childNode.maxOccurrencesInParent = currentCount;
@@ -372,9 +486,8 @@ function analyzeElement(
     analyzeElement(childEl, childNode);
   }
 
-  // Merge child order while preserving relative sequence
-  if (instanceChildSequence.length > 0) {
-    node.childrenOrder = mergeChildOrder(node.childrenOrder, instanceChildSequence);
+  if (instanceChildKeys.length > 0) {
+    node.observedChildSequences.push(instanceChildKeys);
   }
 }
 
@@ -395,9 +508,11 @@ function escapeXmlAttr(str: string): string {
 function buildNodeXsd(
   node: ElementAnalysisNode,
   schemaPrefix: string,
-  rootNsUri: string | null,
+  currentTargetNs: string | null,
   indent = '  ',
-  isTopLevelDeclaration = false
+  isTopLevelDeclaration = false,
+  parentCompositorKind: 'sequence' | 'all' | 'choice' = 'sequence',
+  parentInstancesCount = 1
 ): { xsd: string; complexCount: number; simpleCount: number; elementCount: number; attrCount: number } {
   let complexCount = 0;
   let simpleCount = 0;
@@ -411,34 +526,84 @@ function buildNodeXsd(
   // Determine occurrences for non-root elements
   let occAttrs = '';
   if (!node.isRoot && !isTopLevelDeclaration) {
-    const minOcc = 'minOccurs="0"';
-    const maxOcc = node.maxOccurrencesInParent > 1 ? 'maxOccurs="unbounded"' : '';
-    occAttrs = ` ${minOcc}${maxOcc ? ` ${maxOcc}` : ''}`;
+    if (parentCompositorKind === 'all') {
+      const isReq = parentInstancesCount > 0 && node.parentInstancesPresentCount === parentInstancesCount;
+      occAttrs = isReq ? ' minOccurs="1"' : ' minOccurs="0"';
+    } else if (parentCompositorKind === 'choice') {
+      const maxOcc = node.maxOccurrencesInParent > 1 ? ' maxOccurs="unbounded"' : '';
+      occAttrs = ` minOccurs="0"${maxOcc}`;
+    } else {
+      const isReq = parentInstancesCount > 0 && node.parentInstancesPresentCount === parentInstancesCount;
+      const minOcc = isReq ? ' minOccurs="1"' : ' minOccurs="0"';
+      const maxOcc = node.maxOccurrencesInParent > 1 ? ' maxOccurs="unbounded"' : '';
+      occAttrs = `${minOcc}${maxOcc}`;
+    }
   }
 
   const nillableAttr = node.isNillable ? ' nillable="true"' : '';
 
   // Determine element type structure
   if (node.hasChildElements) {
-    // Case A: Complex Type with child sequence
+    // Case A: Complex Type with child sequence, all, or choice
     complexCount++;
     const mixedAttr = node.isMixed ? ' mixed="true"' : '';
     let childrenXml = '';
 
+    let compositorKind: 'sequence' | 'all' | 'choice' = 'sequence';
+    if (node.hasOrderConflict) {
+      if (node.hasAnyRepeatedChild) {
+        compositorKind = 'choice';
+      } else {
+        compositorKind = 'all';
+      }
+    }
+
+    const compOpen =
+      compositorKind === 'all'
+        ? `${nextIndent}  <${sp}all>\n`
+        : compositorKind === 'choice'
+        ? `${nextIndent}  <${sp}choice minOccurs="0" maxOccurs="unbounded">\n`
+        : `${nextIndent}  <${sp}sequence>\n`;
+
+    const compClose =
+      compositorKind === 'all'
+        ? `${nextIndent}  </${sp}all>\n`
+        : compositorKind === 'choice'
+        ? `${nextIndent}  </${sp}choice>\n`
+        : `${nextIndent}  </${sp}sequence>\n`;
+
     for (const childKey of node.childrenOrder) {
       const childNode = node.childrenMap.get(childKey);
       if (childNode) {
-        const isForeignEl = Boolean(childNode.namespaceURI && rootNsUri && childNode.namespaceURI !== rootNsUri);
+        const isForeignEl = isForeignNamespace(childNode.namespaceURI, currentTargetNs);
         if (isForeignEl) {
           const qName = childNode.prefix ? `${childNode.prefix}:${childNode.localName}` : childNode.localName;
-          const minOcc = 'minOccurs="0"';
-          const maxOcc = childNode.maxOccurrencesInParent > 1 ? ' maxOccurs="unbounded"' : '';
-          const occ = ` ${minOcc}${maxOcc}`;
+          let occ = '';
+          if (compositorKind === 'all') {
+            const isReq = node.totalInstancesObserved > 0 && childNode.parentInstancesPresentCount === node.totalInstancesObserved;
+            occ = isReq ? ' minOccurs="1"' : ' minOccurs="0"';
+          } else if (compositorKind === 'choice') {
+            const maxOcc = childNode.maxOccurrencesInParent > 1 ? ' maxOccurs="unbounded"' : '';
+            occ = ` minOccurs="0"${maxOcc}`;
+          } else {
+            const isReq = node.totalInstancesObserved > 0 && childNode.parentInstancesPresentCount === node.totalInstancesObserved;
+            const minOcc = isReq ? ' minOccurs="1"' : ' minOccurs="0"';
+            const maxOcc = childNode.maxOccurrencesInParent > 1 ? ' maxOccurs="unbounded"' : '';
+            occ = `${minOcc}${maxOcc}`;
+          }
           const nillable = childNode.isNillable ? ' nillable="true"' : '';
           childrenXml += `${innerIndent}<${sp}element ref="${escapeXmlAttr(qName)}"${occ}${nillable} />\n`;
           elementCount++;
         } else {
-          const res = buildNodeXsd(childNode, schemaPrefix, rootNsUri, innerIndent);
+          const res = buildNodeXsd(
+            childNode,
+            schemaPrefix,
+            currentTargetNs,
+            innerIndent,
+            false,
+            compositorKind,
+            node.totalInstancesObserved
+          );
           childrenXml += res.xsd;
           complexCount += res.complexCount;
           simpleCount += res.simpleCount;
@@ -450,21 +615,26 @@ function buildNodeXsd(
 
     let attrsXml = '';
     for (const [, attr] of node.attributesMap) {
-      const isForeignAttr = Boolean(attr.prefix && attr.namespaceURI && rootNsUri && attr.namespaceURI !== rootNsUri);
-      if (isForeignAttr) {
+      const isForeignAttr = isForeignNamespace(attr.namespaceURI, currentTargetNs);
+      const isRequired = node.totalInstancesObserved > 0 && attr.presenceCount === node.totalInstancesObserved;
+      const useAttr = isRequired ? 'use="required"' : 'use="optional"';
+
+      if (attr.prefix === 'xml') {
+        attrsXml += `${innerIndent}<${sp}attribute ref="xml:${escapeXmlAttr(attr.localName)}" ${useAttr} />\n`;
+      } else if (isForeignAttr) {
         const qName = attr.prefix ? `${attr.prefix}:${attr.localName}` : attr.localName;
-        attrsXml += `${innerIndent}<${sp}attribute ref="${escapeXmlAttr(qName)}" use="optional" />\n`;
+        attrsXml += `${innerIndent}<${sp}attribute ref="${escapeXmlAttr(qName)}" ${useAttr} />\n`;
       } else {
-        attrsXml += `${innerIndent}<${sp}attribute name="${escapeXmlAttr(attr.localName)}" type="${attr.type}" use="optional" />\n`;
+        attrsXml += `${innerIndent}<${sp}attribute name="${escapeXmlAttr(attr.localName)}" type="${attr.type}" ${useAttr} />\n`;
       }
     }
 
     const xsd =
       `${indent}<${sp}element name="${escapeXmlAttr(node.localName)}"${occAttrs}${nillableAttr}>\n` +
       `${nextIndent}<${sp}complexType${mixedAttr}>\n` +
-      `${nextIndent}  <${sp}sequence>\n` +
+      compOpen +
       childrenXml +
-      `${nextIndent}  </${sp}sequence>\n` +
+      compClose +
       attrsXml +
       `${nextIndent}</${sp}complexType>\n` +
       `${indent}</${sp}element>\n`;
@@ -483,12 +653,17 @@ function buildNodeXsd(
 
     let attrsXml = '';
     for (const [, attr] of node.attributesMap) {
-      const isForeignAttr = Boolean(attr.prefix && attr.namespaceURI && rootNsUri && attr.namespaceURI !== rootNsUri);
-      if (isForeignAttr) {
+      const isForeignAttr = isForeignNamespace(attr.namespaceURI, currentTargetNs);
+      const isRequired = node.totalInstancesObserved > 0 && attr.presenceCount === node.totalInstancesObserved;
+      const useAttr = isRequired ? 'use="required"' : 'use="optional"';
+
+      if (attr.prefix === 'xml') {
+        attrsXml += `${innerIndent}  <${sp}attribute ref="xml:${escapeXmlAttr(attr.localName)}" ${useAttr} />\n`;
+      } else if (isForeignAttr) {
         const qName = attr.prefix ? `${attr.prefix}:${attr.localName}` : attr.localName;
-        attrsXml += `${innerIndent}  <${sp}attribute ref="${escapeXmlAttr(qName)}" use="optional" />\n`;
+        attrsXml += `${innerIndent}  <${sp}attribute ref="${escapeXmlAttr(qName)}" ${useAttr} />\n`;
       } else {
-        attrsXml += `${innerIndent}  <${sp}attribute name="${escapeXmlAttr(attr.localName)}" type="${attr.type}" use="optional" />\n`;
+        attrsXml += `${innerIndent}  <${sp}attribute name="${escapeXmlAttr(attr.localName)}" type="${attr.type}" ${useAttr} />\n`;
       }
     }
 
@@ -509,12 +684,17 @@ function buildNodeXsd(
     complexCount++;
     let attrsXml = '';
     for (const [, attr] of node.attributesMap) {
-      const isForeignAttr = Boolean(attr.prefix && attr.namespaceURI && rootNsUri && attr.namespaceURI !== rootNsUri);
-      if (isForeignAttr) {
+      const isForeignAttr = isForeignNamespace(attr.namespaceURI, currentTargetNs);
+      const isRequired = node.totalInstancesObserved > 0 && attr.presenceCount === node.totalInstancesObserved;
+      const useAttr = isRequired ? 'use="required"' : 'use="optional"';
+
+      if (attr.prefix === 'xml') {
+        attrsXml += `${innerIndent}<${sp}attribute ref="xml:${escapeXmlAttr(attr.localName)}" ${useAttr} />\n`;
+      } else if (isForeignAttr) {
         const qName = attr.prefix ? `${attr.prefix}:${attr.localName}` : attr.localName;
-        attrsXml += `${innerIndent}<${sp}attribute ref="${escapeXmlAttr(qName)}" use="optional" />\n`;
+        attrsXml += `${innerIndent}<${sp}attribute ref="${escapeXmlAttr(qName)}" ${useAttr} />\n`;
       } else {
-        attrsXml += `${innerIndent}<${sp}attribute name="${escapeXmlAttr(attr.localName)}" type="${attr.type}" use="optional" />\n`;
+        attrsXml += `${innerIndent}<${sp}attribute name="${escapeXmlAttr(attr.localName)}" type="${attr.type}" ${useAttr} />\n`;
       }
     }
 
@@ -593,21 +773,27 @@ function collectForeignDeclarations(
   node: ElementAnalysisNode,
   rootNsUri: string | null,
   foreignElements: Map<string, Map<string, ElementAnalysisNode>>,
-  foreignAttributes: Map<string, Map<string, { name: string; localName: string; prefix: string | null; namespaceURI: string | null; type: string }>>
+  foreignAttributes: Map<
+    string,
+    Map<string, { name: string; localName: string; prefix: string | null; namespaceURI: string | null; type: string }>
+  >,
+  parentNsUri: string | null = rootNsUri
 ): void {
-  if (node.namespaceURI && rootNsUri && node.namespaceURI !== rootNsUri) {
-    let elMap = foreignElements.get(node.namespaceURI);
-    if (!elMap) {
-      elMap = new Map();
-      foreignElements.set(node.namespaceURI, elMap);
-    }
-    if (!elMap.has(node.localName)) {
-      elMap.set(node.localName, node);
+  if (node.namespaceURI && isForeignNamespace(node.namespaceURI, rootNsUri)) {
+    if (parentNsUri !== node.namespaceURI) {
+      let elMap = foreignElements.get(node.namespaceURI);
+      if (!elMap) {
+        elMap = new Map();
+        foreignElements.set(node.namespaceURI, elMap);
+      }
+      if (!elMap.has(node.localName)) {
+        elMap.set(node.localName, node);
+      }
     }
   }
 
   for (const [, attr] of node.attributesMap) {
-    if (attr.namespaceURI && rootNsUri && attr.namespaceURI !== rootNsUri) {
+    if (attr.namespaceURI && isForeignNamespace(attr.namespaceURI, rootNsUri)) {
       let attrMap = foreignAttributes.get(attr.namespaceURI);
       if (!attrMap) {
         attrMap = new Map();
@@ -620,7 +806,7 @@ function collectForeignDeclarations(
   }
 
   for (const [, childNode] of node.childrenMap) {
-    collectForeignDeclarations(childNode, rootNsUri, foreignElements, foreignAttributes);
+    collectForeignDeclarations(childNode, rootNsUri, foreignElements, foreignAttributes, node.namespaceURI);
   }
 }
 
@@ -635,7 +821,7 @@ async function buildCompanionSchemas(
   formatOutput: boolean
 ): Promise<Record<string, { targetNamespace: string; prefix?: string; xsd: string; filename: string }>> {
   const schemaSet: Record<string, { targetNamespace: string; prefix?: string; xsd: string; filename: string }> = {};
-  if (foreignNamespaces.length === 0 || !rootNsUri) return schemaSet;
+  if (foreignNamespaces.length === 0) return schemaSet;
 
   const foreignElements = new Map<string, Map<string, ElementAnalysisNode>>();
   const foreignAttributes = new Map<
@@ -739,8 +925,14 @@ export async function generateXsdFromXml(
     };
   }
 
-  // 3. Parse XML using native DOMParser
-  const parser = new DOMParser();
+  // 3. Parse XML using native DOMParser or xmldom fallback
+  let parser: DOMParser;
+  if (typeof DOMParser !== 'undefined') {
+    parser = new DOMParser();
+  } else {
+    const { DOMParser: XmldomParser } = await import('@xmldom/xmldom');
+    parser = new XmldomParser({ onError: () => {} }) as unknown as DOMParser;
+  }
   const xmlDoc = parser.parseFromString(cleanXml, 'application/xml');
 
   // Check for parsererror
@@ -784,9 +976,10 @@ export async function generateXsdFromXml(
 
   const documentNamespaces = collectDocumentNamespaces(xmlDoc);
 
-  // 5. Construct Analysis Tree
+  // 5. Construct Analysis Tree and resolve ordering
   const rootAnalysis = createAnalysisNode(rootLocalName, rootPrefix, rootNsUri, true);
   analyzeElement(rootEl, rootAnalysis);
+  finalizeNodeAnalysis(rootAnalysis);
 
   // 6. Build <xs:schema> Root and Namespace Declarations
   const sp = schemaPrefix ? `${schemaPrefix}:` : '';
@@ -818,12 +1011,22 @@ export async function generateXsdFromXml(
       ns.uri &&
       ns.uri !== rootNsUri &&
       ns.uri !== 'http://www.w3.org/2001/XMLSchema' &&
-      ns.uri !== 'http://www.w3.org/2001/XMLSchema-instance'
+      ns.uri !== 'http://www.w3.org/2001/XMLSchema-instance' &&
+      ns.uri !== 'http://www.w3.org/XML/1998/namespace'
   );
 
   let importsXml = '';
+  // Built-in W3C xml namespace (xml:lang, xml:base, etc.)
+  const usesXmlNamespace = documentNamespaces.some(
+    (ns) => ns.prefix === 'xml' || ns.uri === 'http://www.w3.org/XML/1998/namespace'
+  );
+  if (usesXmlNamespace) {
+    importsXml += `  <${sp}import namespace="http://www.w3.org/XML/1998/namespace" />\n`;
+  }
+
   for (const ns of foreignNamespaces) {
-    importsXml += `  <${sp}import namespace="${escapeXmlAttr(ns.uri)}" />\n`;
+    const filename = `${ns.prefix || 'schema'}.xsd`;
+    importsXml += `  <${sp}import namespace="${escapeXmlAttr(ns.uri)}" schemaLocation="${escapeXmlAttr(filename)}" />\n`;
   }
 
   // 7. Generate Schema Body

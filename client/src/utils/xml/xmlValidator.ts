@@ -811,8 +811,8 @@ export function scanXmlErrors(xml: string): XmlValidationError[] {
         });
       }
 
-      // Check for XML ID uniqueness across document (for 'id' and all DTD-declared ID attributes like 'sku')
-      const idAttrNames = new Set<string>(['id']);
+      // Check for XML ID uniqueness across document (for all DTD-declared ID attributes like 'id' or 'sku')
+      const idAttrNames = new Set<string>();
       if (dtd) {
         for (const [_, attrMap] of dtd.attributes) {
           for (const [aName, decl] of attrMap) {
@@ -995,8 +995,8 @@ function calculateXmlMetrics(
   let maxDepth = 0;
   const namespacesMap = new Map<string, string>();
 
-  function traverse(node: Node, currentDepth: number) {
-    if (node.nodeType === Node.ELEMENT_NODE) {
+  function traverse(node: any, currentDepth: number) {
+    if (node.nodeType === 1 /* ELEMENT_NODE */) {
       elementCount++;
       if (currentDepth > maxDepth) maxDepth = currentDepth;
 
@@ -1017,9 +1017,9 @@ function calculateXmlMetrics(
       for (let i = 0; i < node.childNodes.length; i++) {
         traverse(node.childNodes[i], currentDepth + 1);
       }
-    } else if (node.nodeType === Node.CDATA_SECTION_NODE) {
+    } else if (node.nodeType === 4 /* CDATA_SECTION_NODE */) {
       cdataCount++;
-    } else if (node.nodeType === Node.COMMENT_NODE) {
+    } else if (node.nodeType === 8 /* COMMENT_NODE */) {
       commentCount++;
     }
   }
@@ -1193,6 +1193,30 @@ export function validateXmlStructure(xml: string): XmlValidationDiagnostic {
       return {
         isValid: false,
         errors: finalErrors,
+        warnings: [],
+        metrics: {
+          lineCount: xml.split(/\r?\n/).length,
+          charCount: xml.length,
+          sizeBytes: byteLen,
+          elementCount: 0,
+          attributeCount: 0,
+          maxDepth: 0,
+          namespaces: [],
+          rootElementName: null,
+          cdataCount: 0,
+          commentCount: 0,
+          executionTimeMs: elapsed,
+        },
+      };
+    }
+
+    // Run scanXmlErrors to catch strict XML 1.0 syntax violations (e.g. unquoted attributes,
+    // unescaped ampersands) that lenient DOMParser implementations might tolerate without parsererror
+    const syntaxErrors = scanXmlErrors(xml);
+    if (syntaxErrors.length > 0) {
+      return {
+        isValid: false,
+        errors: syntaxErrors,
         warnings: [],
         metrics: {
           lineCount: xml.split(/\r?\n/).length,
@@ -2295,6 +2319,8 @@ interface XsdComplexTypeDef {
   compositor: XsdCompositor | null;
   attributes: XsdAttributeDecl[];
   mixed: boolean;
+  targetNamespace?: string;
+  elementFormDefault?: 'qualified' | 'unqualified';
 }
 
 type XsdTypeDef = XsdSimpleTypeDef | XsdComplexTypeDef;
@@ -2340,9 +2366,25 @@ function closestXsdAncestor(el: Element, tagLocalName: string): Element | null {
   return null;
 }
 
+/** Safe helper to get child elements across both browser DOM and xmldom/Node environments */
+function getElementChildren(el: Element | null | undefined): Element[] {
+  if (!el) return [];
+  if (el.children) return Array.from(el.children);
+  const result: Element[] = [];
+  if (el.childNodes) {
+    for (let i = 0; i < el.childNodes.length; i++) {
+      const node = el.childNodes[i];
+      if (node && node.nodeType === 1) { // 1 = ELEMENT_NODE
+        result.push(node as Element);
+      }
+    }
+  }
+  return result;
+}
+
 /** Helper: get child elements of a specific XSD local name */
 function xsdChildren(parent: Element, childLocalName: string): Element[] {
-  return Array.from(parent.children).filter(
+  return getElementChildren(parent).filter(
     (c) => localName(c.nodeName) === childLocalName
   );
 }
@@ -2400,7 +2442,7 @@ function parseSimpleType(el: Element, name: string): XsdSimpleTypeDef {
 /** Parse elements from a compositor (sequence/choice/all) */
 function parseCompositorElements(compositorEl: Element, docNsMap?: Map<string, string>): XsdElementDecl[] {
   const elements: XsdElementDecl[] = [];
-  for (const child of Array.from(compositorEl.children)) {
+  for (const child of getElementChildren(compositorEl)) {
     const childLocal = localName(child.nodeName);
     if (childLocal === 'element') {
       const ref = child.getAttribute('ref') || '';
@@ -2447,7 +2489,13 @@ function parseCompositorElements(compositorEl: Element, docNsMap?: Map<string, s
 }
 
 /** Parse a complexType element from XSD */
-function parseComplexType(el: Element, name: string, docNsMap?: Map<string, string>): XsdComplexTypeDef {
+function parseComplexType(
+  el: Element,
+  name: string,
+  docNsMap?: Map<string, string>,
+  docTargetNs?: string,
+  docElementFormDefault?: 'qualified' | 'unqualified'
+): XsdComplexTypeDef {
   const mixed = el.getAttribute('mixed') === 'true';
   const attributes: XsdAttributeDecl[] = [];
   let compositor: XsdCompositor | null = null;
@@ -2560,7 +2608,15 @@ function parseComplexType(el: Element, name: string, docNsMap?: Map<string, stri
     }
   }
 
-  return { kind: 'complex', name, compositor, attributes, mixed };
+  return {
+    kind: 'complex',
+    name,
+    compositor,
+    attributes,
+    mixed,
+    targetNamespace: docTargetNs,
+    elementFormDefault: docElementFormDefault,
+  };
 }
 
 /** Parse identity constraints (unique, key, keyref) from an element declaration */
@@ -2619,6 +2675,10 @@ function compileXsdSchema(xsdDoc: Document, additionalDocs: Document[] = []): Co
     const rootEl = currentDoc.documentElement;
     if (!rootEl) continue;
 
+    const currentDocTargetNs = rootEl.getAttribute('targetNamespace') || '';
+    const currentDocEf = rootEl.getAttribute('elementFormDefault') || 'unqualified';
+    const currentDocElementFormDefault = currentDocEf === 'qualified' ? 'qualified' : 'unqualified';
+
     const currentDocNsMap = new Map<string, string>(docNsMap);
     for (const attr of Array.from(rootEl.attributes)) {
       if (attr.name.startsWith('xmlns:')) {
@@ -2640,7 +2700,10 @@ function compileXsdSchema(xsdDoc: Document, additionalDocs: Document[] = []): Co
     for (const ctEl of Array.from(currentDoc.getElementsByTagNameNS('*', 'complexType'))) {
       const ctName = ctEl.getAttribute('name');
       if (ctName) {
-        types.set(ctName, parseComplexType(ctEl, ctName, currentDocNsMap));
+        types.set(
+          ctName,
+          parseComplexType(ctEl, ctName, currentDocNsMap, currentDocTargetNs, currentDocElementFormDefault)
+        );
       }
     }
 
@@ -2657,7 +2720,10 @@ function compileXsdSchema(xsdDoc: Document, additionalDocs: Document[] = []): Co
       const inlineCT = xsdChild(elDecl, 'complexType');
       if (inlineCT) {
         const inlineTypeName = `__inline_${elName}`;
-        types.set(inlineTypeName, parseComplexType(inlineCT, inlineTypeName, currentDocNsMap));
+        types.set(
+          inlineTypeName,
+          parseComplexType(inlineCT, inlineTypeName, currentDocNsMap, currentDocTargetNs, currentDocElementFormDefault)
+        );
         elType = inlineTypeName;
       }
 
@@ -2687,7 +2753,10 @@ function compileXsdSchema(xsdDoc: Document, additionalDocs: Document[] = []): Co
         const parentName = parentElDecl?.getAttribute('name') || 'anon';
         const inlineTypeName = `__inline_${parentName}_${elName}`;
         if (!types.has(inlineTypeName)) {
-          types.set(inlineTypeName, parseComplexType(inlineCT, inlineTypeName, currentDocNsMap));
+          types.set(
+            inlineTypeName,
+            parseComplexType(inlineCT, inlineTypeName, currentDocNsMap, currentDocTargetNs, currentDocElementFormDefault)
+          );
         }
       }
 
@@ -2886,6 +2955,12 @@ function resolveElementType(
   parentTypeName: string,
   schema: CompiledXsdSchema
 ): XsdTypeDef | null {
+  // Check top-level elements first if ref or named element
+  const topEl = schema.topElements.get(elName);
+  if (topEl && schema.types.has(topEl.type)) {
+    return schema.types.get(topEl.type)!;
+  }
+
   // Check for inline type first
   const inlineKey = `__inline_${parentTypeName.replace('__inline_', '')}_${elName}`;
   if (schema.types.has(inlineKey)) return schema.types.get(inlineKey)!;
@@ -3086,7 +3161,7 @@ export function validateAgainstXsd(
         }
       }
       // Simple type elements should not have child elements
-      if (xmlEl.children.length > 0) {
+      if (getElementChildren(xmlEl).length > 0) {
         errors.push({
           message: `Element <${elLocal}> at ${currentPath} has child elements but is declared as simple type '${typeDef.name}'.`,
           category: 'schema-violation',
@@ -3172,7 +3247,7 @@ export function validateAgainstXsd(
       // Compositor (child element) validation
       if (typeDef.compositor) {
         const comp = typeDef.compositor;
-        const childElements = Array.from(xmlEl.children);
+        const childElements = getElementChildren(xmlEl);
         const hasWildcard = comp.elements.some((e) => e.isAny);
 
         function matchesDecl(childEl: Element, elDecl: XsdElementDecl): boolean {
@@ -3193,12 +3268,24 @@ export function validateAgainstXsd(
 
           if (elDecl.isRef) {
             if (elDecl.namespaceURI && childNs && childNs !== elDecl.namespaceURI) return false;
-            if (elDecl.prefix && childPrefix && childPrefix !== elDecl.prefix) return false;
+            if (!childNs && elDecl.prefix && childPrefix && childPrefix !== elDecl.prefix) return false;
             return true;
           }
 
-          if (schema.elementFormDefault === 'qualified' && schema.targetNamespace) {
-            if (childNs && childNs !== schema.targetNamespace) return false;
+          const currentDocTargetNs =
+            typeDef && 'targetNamespace' in typeDef && typeDef.targetNamespace !== undefined
+              ? typeDef.targetNamespace
+              : schema.targetNamespace;
+          const currentDocElementFormDefault =
+            typeDef && 'elementFormDefault' in typeDef && typeDef.elementFormDefault
+              ? typeDef.elementFormDefault
+              : schema.elementFormDefault;
+
+          if (currentDocElementFormDefault === 'qualified' && currentDocTargetNs) {
+            if (childNs && childNs !== currentDocTargetNs) return false;
+          } else {
+            // In unqualified/no-namespace schema: elements with foreign namespace must not match unqualified declaration
+            if (childNs && childNs !== (currentDocTargetNs || '')) return false;
           }
           return true;
         }
@@ -3223,7 +3310,7 @@ export function validateAgainstXsd(
           const count = matchingChildren.length;
           const displayName = elDecl.ref || elDecl.name;
 
-          if (count < elDecl.minOccurs) {
+          if (comp.kind !== 'choice' && count < elDecl.minOccurs) {
             if (elDecl.minOccurs === 1 && count === 0) {
               errors.push({
                 message: `Required element <${displayName}> is missing under <${elLocal}> at ${currentPath}.`,
@@ -3265,9 +3352,14 @@ export function validateAgainstXsd(
             let childTypeName = elDecl.type;
 
             // Look up inline type
-            const inlineKey = `__inline_${typeName.replace('__inline_', '')}_${elDecl.name}`;
-            if (schema.types.has(inlineKey)) {
-              childTypeName = inlineKey;
+            const parentElName = typeName.split('_').pop() || '';
+            const directInlineKey = `__inline_${parentElName}_${elDecl.name}`;
+            const fullInlineKey = `__inline_${typeName.replace('__inline_', '')}_${elDecl.name}`;
+
+            if (schema.types.has(directInlineKey)) {
+              childTypeName = directInlineKey;
+            } else if (schema.types.has(fullInlineKey)) {
+              childTypeName = fullInlineKey;
             } else if (!childTypeName && schema.types.has(`__inline_${elDecl.name}`)) {
               childTypeName = `__inline_${elDecl.name}`;
             }
@@ -3288,23 +3380,46 @@ export function validateAgainstXsd(
 
         // xs:choice validation
         if (comp.kind === 'choice') {
-          const presentChoiceElements = comp.elements.filter((e) =>
-            childElements.some((c) => matchesDecl(c, e))
-          );
-          if (presentChoiceElements.length > 1) {
-            errors.push({
-              message: `xs:choice violation under <${elLocal}>: Multiple mutually exclusive elements found [${presentChoiceElements.map((e) => e.ref || e.name).join(', ')}]. xs:choice permits only one.`,
-              category: 'schema-violation',
-              code: 'ERR_XSD_CHOICE_MUTEX',
-              suggestion: `Keep only one of [${comp.elements.map((e) => e.ref || e.name).join(', ')}] under <${elLocal}>.`,
-            });
-          } else if (presentChoiceElements.length === 0 && comp.minOccurs > 0) {
-            errors.push({
-              message: `xs:choice violation under <${elLocal}>: None of the permitted choice elements [${comp.elements.map((e) => e.ref || e.name).join(', ')}] were found.`,
-              category: 'schema-violation',
-              code: 'ERR_XSD_CHOICE_MISSING',
-              suggestion: `Add one of [${comp.elements.map((e) => e.ref || e.name).join(', ')}] under <${elLocal}>.`,
-            });
+          if (comp.maxOccurs === 1) {
+            const presentChoiceElements = comp.elements.filter((e) =>
+              childElements.some((c) => matchesDecl(c, e))
+            );
+            if (presentChoiceElements.length > 1) {
+              errors.push({
+                message: `xs:choice violation under <${elLocal}>: Multiple mutually exclusive elements found [${presentChoiceElements.map((e) => e.ref || e.name).join(', ')}]. xs:choice permits only one.`,
+                category: 'schema-violation',
+                code: 'ERR_XSD_CHOICE_MUTEX',
+                suggestion: `Keep only one of [${comp.elements.map((e) => e.ref || e.name).join(', ')}] under <${elLocal}>.`,
+              });
+            } else if (presentChoiceElements.length === 0 && comp.minOccurs > 0) {
+              errors.push({
+                message: `xs:choice violation under <${elLocal}>: None of the permitted choice elements [${comp.elements.map((e) => e.ref || e.name).join(', ')}] were found.`,
+                category: 'schema-violation',
+                code: 'ERR_XSD_CHOICE_MISSING',
+                suggestion: `Add one of [${comp.elements.map((e) => e.ref || e.name).join(', ')}] under <${elLocal}>.`,
+              });
+            }
+          } else {
+            // Choice group with maxOccurs > 1 or maxOccurs="unbounded" (-1)
+            const totalMatches = childElements.filter((c) =>
+              comp.elements.some((e) => matchesDecl(c, e))
+            ).length;
+            if (comp.minOccurs > 0 && totalMatches < comp.minOccurs) {
+              errors.push({
+                message: `xs:choice violation under <${elLocal}>: Total element count ${totalMatches} is less than required minOccurs="${comp.minOccurs}".`,
+                category: 'schema-violation',
+                code: 'ERR_XSD_MIN_OCCURS',
+                suggestion: `Provide at least ${comp.minOccurs} elements from the choice group.`,
+              });
+            }
+            if (comp.maxOccurs !== -1 && totalMatches > comp.maxOccurs) {
+              errors.push({
+                message: `xs:choice violation under <${elLocal}>: Total element count ${totalMatches} exceeds maxOccurs="${comp.maxOccurs}".`,
+                category: 'schema-violation',
+                code: 'ERR_XSD_MAX_OCCURS',
+                suggestion: `Provide at most ${comp.maxOccurs} elements from the choice group.`,
+              });
+            }
           }
         }
 
@@ -3330,7 +3445,7 @@ export function validateAgainstXsd(
             }
           }
         }
-      } else if (!typeDef.mixed && xmlEl.children.length > 0) {
+      } else if (!typeDef.mixed && getElementChildren(xmlEl).length > 0) {
         // Complex type with no compositor but has child elements
         warnings.push(
           `Element <${elLocal}> at ${currentPath} has child elements but its complex type declares no compositor (sequence/choice/all).`
@@ -3367,7 +3482,7 @@ export function validateAgainstXsd(
         for (const part of parts) {
           const nextNodes: Element[] = [];
           for (const node of selectedNodes) {
-            for (const child of Array.from(node.children)) {
+            for (const child of getElementChildren(node)) {
               const childLocal = child.localName || child.nodeName.split(':').pop() || '';
               if (childLocal === part || part === '*') {
                 nextNodes.push(child);
@@ -3396,7 +3511,7 @@ export function validateAgainstXsd(
             let current: Element | null = selectedNode;
             for (const part of parts) {
               if (!current) break;
-              const matchingChildren: Element[] = Array.from(current.children).filter(
+              const matchingChildren: Element[] = getElementChildren(current).filter(
                 (c: Element) => (c.localName || c.nodeName.split(':').pop()) === part
               );
               current = matchingChildren[0] || null;
@@ -3472,7 +3587,7 @@ export function validateAgainstXsd(
         const matchingParentsInXml = xmlDoc.getElementsByTagNameNS('*', parentElName);
         if (matchingParentsInXml.length > 0) {
           Array.from(matchingParentsInXml).forEach((parentXmlNode) => {
-            const hasChild = Array.from(parentXmlNode.children).some(
+            const hasChild = getElementChildren(parentXmlNode).some(
               (c) => (c.localName || c.nodeName.split(':').pop()) === elName
             );
             if (!hasChild) {
@@ -3669,7 +3784,7 @@ export function autoFixXmlWithXsd(xml: string, xsd: string): AutoFixResult {
         // Element sequence ordering & tag casing
         if (typeDef.compositor) {
           const comp = typeDef.compositor;
-          const childElements = Array.from(el.children);
+          const childElements = getElementChildren(el);
 
           // Tag casing repair: check if a child's name matches an element in compositor case-insensitively
           for (const child of childElements) {
@@ -3704,7 +3819,7 @@ export function autoFixXmlWithXsd(xml: string, xsd: string): AutoFixResult {
 
           // Sequence reordering: if comp.kind === 'sequence', check if children are out of order
           if (comp.kind === 'sequence') {
-            const currentChildren = Array.from(el.children);
+            const currentChildren = getElementChildren(el);
             const declNamesOrder = comp.elements.map((e) => e.name);
 
             let isOutOfOrder = false;
@@ -3750,7 +3865,7 @@ export function autoFixXmlWithXsd(xml: string, xsd: string): AutoFixResult {
           }
 
           // Recurse into children
-          for (const c of Array.from(el.children)) {
+          for (const c of getElementChildren(el)) {
             const cName = c.localName || c.nodeName.split(':').pop() || '';
             const decl = comp.elements.find((e) => e.name === cName);
             let childTypeName = decl?.type || '';

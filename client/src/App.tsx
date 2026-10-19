@@ -12,6 +12,9 @@ const ToolsPage = lazy(() => import('@/pages/ToolsPage').then((m) => ({ default:
 const XmlFormatterPage = lazy(() => import('@/pages/XmlFormatterPage').then((m) => ({ default: m.XmlFormatterPage })));
 const XmlValidatorPage = lazy(() => import('@/pages/XmlValidatorPage').then((m) => ({ default: m.XmlValidatorPage })));
 const XmlToXsdPage = lazy(() => import('@/pages/XmlToXsdPage').then((m) => ({ default: m.XmlToXsdPage })));
+const XPathTesterPage = lazy(() => import('@/pages/XPathTesterPage').then((m) => ({ default: m.XPathTesterPage })));
+const GroovyTesterPage = lazy(() => import('@/pages/GroovyTesterPage').then((m) => ({ default: m.GroovyTesterPage })));
+const XsltGeneratorPage = lazy(() => import('@/pages/XsltGeneratorPage').then((m) => ({ default: m.XsltGeneratorPage })));
 const AboutPage = lazy(() => import('@/pages/AboutPage').then((m) => ({ default: m.AboutPage })));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
@@ -79,6 +82,30 @@ export function App() {
                 element={
                   <Suspense fallback={<PageLoader />}>
                     <XmlToXsdPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="tools/xpath-tester"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <XPathTesterPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="tools/groovy-tester"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <GroovyTesterPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="tools/xslt-generator"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <XsltGeneratorPage />
                   </Suspense>
                 }
               />

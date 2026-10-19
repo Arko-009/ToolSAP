@@ -11,10 +11,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@codemirror/lang-json": "^6.0.2",
     "@codemirror/lang-xml": "^6.1.0",
+    "@codemirror/legacy-modes": "^6.5.5",
     "@prettier/plugin-xml": "^3.4.2",
     "@types/three": "^0.186.0",
     "@uiw/react-codemirror": "^4.25.12",
+    "@xmldom/xmldom": "^0.9.12",
+    "fontoxpath": "^3.34.0",
     "framer-motion": "^14.0.0",
     "lucide-react": "^1.46.0",
     "prettier": "^3.9.9",
@@ -22,7 +26,8 @@
     "react-dom": "^19.3.0",
     "react-helmet-async": "^3.0.0",
     "react-router-dom": "^7.18.3",
-    "three": "^0.186.1"
+    "three": "^0.186.1",
+    "xslt-processor": "^5.1.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",

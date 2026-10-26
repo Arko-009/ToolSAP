@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   FileCheck2,
   CheckCircle2,
@@ -43,6 +43,7 @@ const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 export function XmlValidatorPage() {
   const { addToast } = useToastContext();
+  const location = useLocation();
 
   // State
   const [inputXml, setInputXml] = useState('');
@@ -50,6 +51,20 @@ export function XmlValidatorPage() {
   const [validationMode, setValidationMode] = useState<'syntax' | 'xsd'>('syntax');
   const [activeTab, setActiveTab] = useState<'xml' | 'xsd'>('xml');
   const [activeFileName, setActiveFileName] = useState<string | null>(null);
+
+  // Load XML forwarded from XML Formatter (on syntax error) or other tools
+  useEffect(() => {
+    const forwardedXml = (location.state as { xml?: string } | null)?.xml;
+    if (forwardedXml) {
+      setInputXml(forwardedXml);
+      return;
+    }
+    const sessionXml = sessionStorage.getItem('toolsap_xml_to_validate');
+    if (sessionXml) {
+      setInputXml(sessionXml);
+      sessionStorage.removeItem('toolsap_xml_to_validate');
+    }
+  }, [location.state]);
 
   // Diagnostics state
   const [diagnostic, setDiagnostic] = useState<XmlValidationDiagnostic>(() =>

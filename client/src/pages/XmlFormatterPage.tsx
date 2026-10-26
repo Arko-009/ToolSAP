@@ -32,12 +32,13 @@ import {
   type XmlFormatOptions,
   type XmlValidationError,
 } from '@/utils/xml/xmlFormatter';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 export function XmlFormatterPage() {
   const { addToast } = useToastContext();
+  const navigate = useNavigate();
 
   // State
   const [inputXml, setInputXml] = useState('');
@@ -45,9 +46,20 @@ export function XmlFormatterPage() {
   const [activeFileName, setActiveFileName] = useState<string | null>(null);
   const [lastMode, setLastMode] = useState<'formatted' | 'minified' | null>(null);
 
+  // Redirect to XML Validator tool
+  const redirectToValidator = useCallback(
+    (xmlCode?: string) => {
+      const xml = xmlCode !== undefined ? xmlCode : inputXml;
+      if (xml) {
+        sessionStorage.setItem('toolsap_xml_to_validate', xml);
+      }
+      navigate('/tools/xml-validator', { state: { xml } });
+    },
+    [inputXml, navigate]
+  );
+
   // Formatting options
   const [tabWidth, setTabWidth] = useState<2 | 4>(2);
-  const [whitespaceSensitivity, setWhitespaceSensitivity] = useState<'ignore' | 'strict'>('ignore');
   const [quoteStyle, setQuoteStyle] = useState<'preserve' | 'double' | 'single'>('double');
   const [showOptions, setShowOptions] = useState(false);
 
@@ -85,7 +97,7 @@ export function XmlFormatterPage() {
 
     const options: XmlFormatOptions = {
       tabWidth,
-      xmlWhitespaceSensitivity: whitespaceSensitivity,
+      xmlWhitespaceSensitivity: 'ignore',
       xmlQuoteAttributes: quoteStyle,
       xmlSelfClosingSpace: true,
     };
@@ -107,7 +119,14 @@ export function XmlFormatterPage() {
         setLastMode(null);
         addToast({
           type: 'error',
-          title: result.error.message,
+          title: 'First Fix XML code With Validator',
+          description: result.error.message || 'Syntax error detected. Click to open XML Validator and repair issues.',
+          duration: 9000,
+          action: {
+            label: 'Open XML Validator',
+            onClick: () => redirectToValidator(xmlToFormat),
+          },
+          onClick: () => redirectToValidator(xmlToFormat),
         });
       }
     } catch (err: unknown) {
@@ -116,11 +135,21 @@ export function XmlFormatterPage() {
       setOutputXml('');
       setStats(null);
       setLastMode(null);
-      addToast({ type: 'error', title: msg });
+      addToast({
+        type: 'error',
+        title: 'First Fix XML code With Validator',
+        description: `${msg}. Click to open XML Validator and repair issues.`,
+        duration: 9000,
+        action: {
+          label: 'Open XML Validator',
+          onClick: () => redirectToValidator(xmlToFormat),
+        },
+        onClick: () => redirectToValidator(xmlToFormat),
+      });
     } finally {
       setIsFormatting(false);
     }
-  }, [inputXml, tabWidth, whitespaceSensitivity, quoteStyle, addToast]);
+  }, [inputXml, tabWidth, quoteStyle, addToast, redirectToValidator]);
 
   // Minify action
   const handleMinify = useCallback(() => {
@@ -151,7 +180,17 @@ export function XmlFormatterPage() {
         setOutputXml('');
         setStats(null);
         setLastMode(null);
-        addToast({ type: 'error', title: result.error.message });
+        addToast({
+          type: 'error',
+          title: 'First Fix XML code With Validator',
+          description: result.error.message || 'Syntax error detected. Click to open XML Validator and repair issues.',
+          duration: 9000,
+          action: {
+            label: 'Open XML Validator',
+            onClick: () => redirectToValidator(inputXml),
+          },
+          onClick: () => redirectToValidator(inputXml),
+        });
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Minification failed';
@@ -159,11 +198,21 @@ export function XmlFormatterPage() {
       setOutputXml('');
       setStats(null);
       setLastMode(null);
-      addToast({ type: 'error', title: msg });
+      addToast({
+        type: 'error',
+        title: 'First Fix XML code With Validator',
+        description: `${msg}. Click to open XML Validator and repair issues.`,
+        duration: 9000,
+        action: {
+          label: 'Open XML Validator',
+          onClick: () => redirectToValidator(inputXml),
+        },
+        onClick: () => redirectToValidator(inputXml),
+      });
     } finally {
       setIsFormatting(false);
     }
-  }, [inputXml, addToast]);
+  }, [inputXml, addToast, redirectToValidator]);
 
   // Load sample XML
   const handleLoadSample = useCallback(() => {
@@ -458,34 +507,6 @@ export function XmlFormatterPage() {
                         ))}
                       </div>
                     </div>
-
-                    <div>
-                      <label className="block text-neutral-700 font-semibold mb-1">
-                        Whitespace Handling
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => setWhitespaceSensitivity('ignore')}
-                          className={`py-1.5 px-2.5 rounded-lg border text-center font-medium transition-all ${
-                            whitespaceSensitivity === 'ignore'
-                              ? 'bg-primary-50 border-primary-500 text-primary-700 font-semibold'
-                              : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50'
-                          }`}
-                        >
-                          Standard (Pretty)
-                        </button>
-                        <button
-                          onClick={() => setWhitespaceSensitivity('strict')}
-                          className={`py-1.5 px-2.5 rounded-lg border text-center font-medium transition-all ${
-                            whitespaceSensitivity === 'strict'
-                              ? 'bg-primary-50 border-primary-500 text-primary-700 font-semibold'
-                              : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50'
-                          }`}
-                        >
-                          Strict
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>
@@ -572,8 +593,19 @@ export function XmlFormatterPage() {
               <div className="px-4 py-3 bg-rose-50 border-b border-rose-200 text-rose-900 text-xs flex items-start gap-2.5 animate-fade-in">
                 <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <div className="font-semibold text-rose-800">XML Syntax Error Detected</div>
-                  <div className="mt-0.5 leading-relaxed">{error.message}</div>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="font-semibold text-rose-800">XML Syntax Error Detected</div>
+                    <button
+                      type="button"
+                      onClick={() => redirectToValidator(inputXml)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-semibold text-xs transition-colors shadow-xs cursor-pointer"
+                    >
+                      <FileCheck className="h-3.5 w-3.5" />
+                      <span>First Fix XML code With Validator</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="mt-1 leading-relaxed">{error.message}</div>
                   {(error.line !== undefined || error.column !== undefined) && (
                     <div className="mt-1 font-mono text-[11px] text-rose-700">
                       Location:{' '}

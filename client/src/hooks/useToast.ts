@@ -1,11 +1,18 @@
 import { useState, useCallback } from 'react';
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface ToastMessage {
   id: string;
   type: 'success' | 'error' | 'warning' | 'info';
   title: string;
   description?: string;
   duration?: number;
+  action?: ToastAction;
+  onClick?: () => void;
 }
 
 type AddToast = (toast: Omit<ToastMessage, 'id'>) => void;

@@ -7,6 +7,70 @@
   "trailingSlash": false,
   "rewrites": [
     {
+      "source": "/tools",
+      "destination": "/tools.html"
+    },
+    {
+      "source": "/learning",
+      "destination": "/learning.html"
+    },
+    {
+      "source": "/learning/integration-development",
+      "destination": "/learning/integration-development.html"
+    },
+    {
+      "source": "/about",
+      "destination": "/about.html"
+    },
+    {
+      "source": "/tools/xml-formatter",
+      "destination": "/tools/xml-formatter.html"
+    },
+    {
+      "source": "/tools/xml-validator",
+      "destination": "/tools/xml-validator.html"
+    },
+    {
+      "source": "/tools/xml-to-xsd",
+      "destination": "/tools/xml-to-xsd.html"
+    },
+    {
+      "source": "/tools/json-xml",
+      "destination": "/tools/json-xml.html"
+    },
+    {
+      "source": "/tools/xpath-tester",
+      "destination": "/tools/xpath-tester.html"
+    },
+    {
+      "source": "/tools/xslt-generator",
+      "destination": "/tools/xslt-generator.html"
+    },
+    {
+      "source": "/tools/groovy-tester",
+      "destination": "/tools/groovy-tester.html"
+    },
+    {
+      "source": "/tools/base64-codec",
+      "destination": "/tools/base64-codec.html"
+    },
+    {
+      "source": "/tools/jwt-decoder",
+      "destination": "/tools/jwt-decoder.html"
+    },
+    {
+      "source": "/tools/cpi-property-simulator",
+      "destination": "/tools/cpi-property-simulator.html"
+    },
+    {
+      "source": "/tools/url-codec",
+      "destination": "/tools/url-codec.html"
+    },
+    {
+      "source": "/tools/cron-parser",
+      "destination": "/tools/cron-parser.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

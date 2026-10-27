@@ -20,6 +20,7 @@ import {
   HelpCircle,
   Trash2,
   X,
+  ChevronDown,
 } from 'lucide-react';
 import { SEOHead } from '@/components/common/SEOHead';
 import { Button } from '@/components/ui/Button';
@@ -41,6 +42,39 @@ import {
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
+export const XML_VALIDATOR_FAQS = [
+  {
+    question: 'What is an XML Validator and why is it important?',
+    answer:
+      'An XML Validator is a developer utility that verifies whether an XML document adheres strictly to W3C XML specifications. It performs two critical levels of verification: Well-Formedness (ensuring valid root element, matching case-sensitive tags, proper nesting, and quoted attributes) and Schema Validity (checking elements, sequences, and data types against an XSD schema or DTD). Validating XML prevents parser exceptions, HTTP 500 adapter errors, and broken data integrations.',
+  },
+  {
+    question: 'How do I validate an XML file online for free?',
+    answer:
+      'Paste your XML code directly into the editor or click "Upload File" to load any .xml, .xsd, or .wsdl document. ToolSAP runs real-time syntax checking in your browser, highlighting syntax errors with exact line and column numbers. You can also validate against a custom schema by switching to the "XSD Schema" mode.',
+  },
+  {
+    question: 'What is the difference between Well-Formed XML and Valid XML?',
+    answer:
+      'Well-Formed XML satisfies general XML syntax rules (one root element, all tags closed, correct casing, properly escaped characters like &amp; and &lt;). Valid XML is well-formed XML that also strictly adheres to the structural rules, cardinality constraints, and data types defined in a corresponding XSD (XML Schema Definition) or DTD document.',
+  },
+  {
+    question: 'How does the 1-Click Auto-Fix XML feature work?',
+    answer:
+      'ToolSAP includes an intelligent client-side Auto-Fix engine. When your XML has syntax errors—such as missing closing tags, unescaped ampersands (& to &amp;), unquoted attributes, unclosed comments, or duplicate XML declarations—clicking "Auto-Fix XML" automatically repairs the syntax and displays an audit diff of every change made.',
+  },
+  {
+    question: 'Is my XML payload secure and private when validating online?',
+    answer:
+      'Yes, 100% private. All XML parsing, syntax checking, and schema validation execute entirely in your web browser using local client-side JavaScript. Your confidential ERP payloads, customer data, and API messages are never transmitted to any external server or stored anywhere.',
+  },
+  {
+    question: 'Can I validate XML against a custom XSD Schema?',
+    answer:
+      'Yes. Toggle to the "XSD Schema" validation mode to input or upload your W3C XSD schema. ToolSAP validates element sequences, required attributes, enumeration constraints, and data types against the provided schema definition.',
+  },
+];
+
 export function XmlValidatorPage() {
   const { addToast } = useToastContext();
   const location = useLocation();
@@ -51,6 +85,7 @@ export function XmlValidatorPage() {
   const [validationMode, setValidationMode] = useState<'syntax' | 'xsd'>('syntax');
   const [activeTab, setActiveTab] = useState<'xml' | 'xsd'>('xml');
   const [activeFileName, setActiveFileName] = useState<string | null>(null);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
   // Load XML forwarded from XML Formatter (on syntax error) or other tools
   useEffect(() => {
@@ -338,29 +373,67 @@ export function XmlValidatorPage() {
         ]}
       />
 
-      {/* JSON-LD Structured Data for Software Application */}
+      {/* JSON-LD Structured Data with @graph for WebApplication, BreadcrumbList, and FAQPage */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             '@context': 'https://schema.org',
-            '@type': 'WebApplication',
-            name: 'Free XML Validator Online | ToolSAP',
-            url: 'https://tool-sap.vercel.app/tools/xml-validator',
-            description:
-              'Validate XML syntax, find errors with line numbers, and check XML against an XSD schema using ToolSAP’s free online XML Validator.',
-            applicationCategory: 'DeveloperApplication',
-            operatingSystem: 'All',
-            offers: {
-              '@type': 'Offer',
-              price: '0',
-              priceCurrency: 'USD',
-            },
-            creator: {
-              '@type': 'Organization',
-              name: 'ToolSAP',
-              url: 'https://tool-sap.vercel.app/',
-            },
+            '@graph': [
+              {
+                '@type': 'WebApplication',
+                name: 'Free XML Validator Online | ToolSAP',
+                url: 'https://tool-sap.vercel.app/tools/xml-validator',
+                description:
+                  'Validate XML syntax, find errors with line numbers, and check XML against an XSD schema using ToolSAP’s free online XML Validator.',
+                applicationCategory: 'DeveloperApplication',
+                operatingSystem: 'All',
+                offers: {
+                  '@type': 'Offer',
+                  price: '0',
+                  priceCurrency: 'USD',
+                },
+                creator: {
+                  '@type': 'Organization',
+                  name: 'ToolSAP',
+                  url: 'https://tool-sap.vercel.app/',
+                },
+              },
+              {
+                '@type': 'BreadcrumbList',
+                itemListElement: [
+                  {
+                    '@type': 'ListItem',
+                    position: 1,
+                    name: 'Home',
+                    item: 'https://tool-sap.vercel.app/',
+                  },
+                  {
+                    '@type': 'ListItem',
+                    position: 2,
+                    name: 'Tools',
+                    item: 'https://tool-sap.vercel.app/tools',
+                  },
+                  {
+                    '@type': 'ListItem',
+                    position: 3,
+                    name: 'Free XML Validator Online',
+                    item: 'https://tool-sap.vercel.app/tools/xml-validator',
+                  },
+                ],
+              },
+              {
+                '@type': 'FAQPage',
+                mainEntity: XML_VALIDATOR_FAQS.map((faq) => ({
+                  '@type': 'Question',
+                  name: faq.question,
+                  acceptedAnswer: {
+                    '@type': 'Answer',
+                    text: faq.answer,
+                  },
+                })),
+              },
+            ],
           }),
         }}
       />
@@ -1096,71 +1169,253 @@ export function XmlValidatorPage() {
           </div>
         }
         infoSection={
-          <div className="border-t border-neutral-200/80 pt-10">
-            {/* Guide Header */}
-            <div className="max-w-3xl mb-8">
-              <Badge variant="neutral" size="sm" className="mb-2">
-                SAP Integration Knowledge
-              </Badge>
-              <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 tracking-tight">
-                Troubleshooting XML Errors in SAP Cloud Integration (CPI)
-              </h2>
-              <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
-                XML parsing errors are the leading cause of HTTP 500 adapter crashes and mapping runtime exceptions in SAP Integration Suite. Here is how to diagnose and prevent them.
-              </p>
+          <div className="border-t border-neutral-200/80 pt-12 space-y-14">
+            {/* Section 1: How to Validate XML Online (3 Steps) */}
+            <div>
+              <div className="max-w-3xl mb-8">
+                <Badge variant="neutral" size="sm" className="mb-2">
+                  Step-by-Step Guide
+                </Badge>
+                <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 tracking-tight">
+                  How to Validate XML Online in 3 Easy Steps
+                </h2>
+                <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
+                  Validate XML well-formedness, inspect syntax error line numbers, and check XML against W3C XSD schemas with zero setup.
+                </p>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs relative">
+                  <div className="w-8 h-8 rounded-lg bg-primary-50 text-primary-600 font-bold text-sm flex items-center justify-center mb-3">
+                    1
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">
+                    Paste or Upload XML
+                  </h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Paste your raw XML markup into the code editor or click <strong className="text-neutral-800">Upload File</strong> to load any <code className="text-primary-700 bg-neutral-100 px-1 py-0.5 rounded">.xml</code>, <code className="text-primary-700 bg-neutral-100 px-1 py-0.5 rounded">.xsd</code>, or <code className="text-primary-700 bg-neutral-100 px-1 py-0.5 rounded">.wsdl</code> payload up to 5 MB.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs relative">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 font-bold text-sm flex items-center justify-center mb-3">
+                    2
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">
+                    Instant Real-Time Diagnosis
+                  </h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    ToolSAP automatically parses your XML as you type. If an error is detected, exact line numbers, column coordinates, and detailed error explanations appear in real time.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs relative">
+                  <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 font-bold text-sm flex items-center justify-center mb-3">
+                    3
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">
+                    1-Click Auto-Fix or Validate XSD
+                  </h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Click <strong className="text-neutral-800">Auto-Fix XML</strong> to repair unclosed tags, bare ampersands, and unquoted attributes, or switch to the XSD tab to validate against an XSD schema.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {/* Common Issues Grid */}
-            <div className="grid md:grid-cols-3 gap-6 mb-10">
-              <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
-                <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center mb-3">
-                  <Zap className="h-4 w-4" />
-                </div>
-                <h3 className="text-sm font-semibold text-neutral-900 mb-1">
-                  Unescaped Characters in Text
-                </h3>
-                <p className="text-xs text-neutral-600 leading-relaxed">
-                  Legacy ERP or CRM payloads frequently include bare ampersands (e.g., &quot;AT&amp;T&quot;). In XML, these must be strictly encoded as <code className="text-primary-700 bg-neutral-100 px-1 py-0.5 rounded">&amp;amp;</code>.
+            {/* Section 2: Key Capabilities Grid */}
+            <div>
+              <div className="max-w-3xl mb-8">
+                <Badge variant="neutral" size="sm" className="mb-2">
+                  Tool Capabilities
+                </Badge>
+                <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 tracking-tight">
+                  Free Online XML Validator Features
+                </h2>
+                <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
+                  Engineered for developers, enterprise architects, and integration engineers who require fast, private, and dependable XML validation.
                 </p>
               </div>
 
-              <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
-                  <Code2 className="h-4 w-4" />
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
+                    <FileCheck2 className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">W3C Well-Formedness Check</h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Validates syntax according to official W3C XML standards. Checks root elements, closing tag pairs, nested hierarchies, and attribute quoting.
+                  </p>
                 </div>
-                <h3 className="text-sm font-semibold text-neutral-900 mb-1">
-                  Tag Casing Discrepancies
-                </h3>
-                <p className="text-xs text-neutral-600 leading-relaxed">
-                  Unlike HTML, XML is strictly case-sensitive. Closing <code className="text-primary-700 bg-neutral-100 px-1 py-0.5 rounded">&lt;Sender&gt;</code> with <code className="text-primary-700 bg-neutral-100 px-1 py-0.5 rounded">&lt;/sender&gt;</code> triggers an unrecoverable DOM parser failure.
-                </p>
-              </div>
 
-              <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
-                  <Shield className="h-4 w-4" />
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
+                    <Layers className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">W3C XML Schema (XSD) Validation</h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Validate XML payloads against complete XSD schemas. Verifies element sequences, required child tags, min/max occurrences, and data types.
+                  </p>
                 </div>
-                <h3 className="text-sm font-semibold text-neutral-900 mb-1">
-                  100% Client-Side Privacy
-                </h3>
-                <p className="text-xs text-neutral-600 leading-relaxed">
-                  ToolSAP processes all validation directly in your browser JavaScript engine. Sensitive ERP customer master data, financial records, and employee information never touch external servers.
-                </p>
+
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center mb-3">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">1-Click Auto-Fix Engine</h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Automatically repairs broken XML syntax with intelligent entity escaping, missing tag closure, and quote corrections, complete with an interactive audit diff.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center mb-3">
+                    <AlertCircle className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">Exact Line & Column Mapping</h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Identifies the exact character coordinate of XML parser failures. Click any diagnostic error to jump your cursor directly to the offending line.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center mb-3">
+                    <Shield className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">100% In-Browser Privacy</h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    All validation executes purely in your browser JavaScript engine. Sensitive financial data, customer payloads, and credentials never touch any external server.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3">
+                    <Code2 className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">Enterprise Payload Support</h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Engineered to handle complex SAP IDoc XML, SOAP envelopes, REST XML API responses, multiple declared namespaces (xmlns), and CDATA blocks.
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Cross-Links to Other Tools */}
+            {/* Section 3: Troubleshooting Guide */}
+            <div>
+              <div className="max-w-3xl mb-8">
+                <Badge variant="neutral" size="sm" className="mb-2">
+                  Troubleshooting Guide
+                </Badge>
+                <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 tracking-tight">
+                  Common XML Syntax Errors &amp; Solutions
+                </h2>
+                <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
+                  XML parsing errors are the leading cause of HTTP 500 adapter crashes and message mapping exceptions in enterprise systems and SAP Cloud Integration (CPI).
+                </p>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center mb-3">
+                    <Zap className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">
+                    Unescaped Characters in Text
+                  </h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Legacy ERP or CRM payloads frequently include bare ampersands (e.g., &quot;AT&amp;T&quot;). In XML, these must be strictly encoded as <code className="text-primary-700 bg-neutral-100 px-1 py-0.5 rounded">&amp;amp;</code>.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
+                    <Code2 className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">
+                    Tag Casing Discrepancies
+                  </h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Unlike HTML, XML is strictly case-sensitive. Closing <code className="text-primary-700 bg-neutral-100 px-1 py-0.5 rounded">&lt;Sender&gt;</code> with <code className="text-primary-700 bg-neutral-100 px-1 py-0.5 rounded">&lt;/sender&gt;</code> triggers an unrecoverable DOM parser failure.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
+                    <Shield className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">
+                    Unclosed Comments &amp; CDATA
+                  </h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Missing closing comment delimiters (<code className="text-primary-700 bg-neutral-100 px-1 py-0.5 rounded">--&gt;</code>) or CDATA tags (<code className="text-primary-700 bg-neutral-100 px-1 py-0.5 rounded">]]&gt;</code>) cause parser engines to swallow entire subsequent payloads.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 4: Frequently Asked Questions (FAQ) Accordion */}
+            <div>
+              <div className="max-w-3xl mb-8">
+                <Badge variant="neutral" size="sm" className="mb-2">
+                  Frequently Asked Questions
+                </Badge>
+                <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 tracking-tight">
+                  Free XML Validator FAQs
+                </h2>
+                <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
+                  Everything you need to know about XML validation, XSD schema checking, and browser privacy.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {XML_VALIDATOR_FAQS.map((faq, idx) => {
+                  const isOpen = openFaqIndex === idx;
+                  return (
+                    <div
+                      key={idx}
+                      className="rounded-xl border border-neutral-200 bg-white shadow-2xs overflow-hidden transition-colors"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                        className="w-full py-4 px-5 text-left flex items-center justify-between gap-4 font-semibold text-sm text-neutral-900 hover:text-primary-600 transition-colors cursor-pointer"
+                        aria-expanded={isOpen}
+                      >
+                        <span>{faq.question}</span>
+                        <ChevronDown
+                          className={`h-4 w-4 shrink-0 text-neutral-400 transition-transform duration-200 ${
+                            isOpen ? 'rotate-180 text-primary-600' : ''
+                          }`}
+                        />
+                      </button>
+                      {isOpen && (
+                        <div className="px-5 pb-5 text-xs text-neutral-600 leading-relaxed border-t border-neutral-100 pt-3 animate-fade-in">
+                          {faq.answer}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Section 5: Cross-Links to Other Tools */}
             <div className="p-6 rounded-xl bg-neutral-50 border border-neutral-200/90 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div>
-                <h3 className="text-sm font-semibold text-neutral-900">Explore More Free SAP Developer Tools</h3>
+                <h3 className="text-sm font-semibold text-neutral-900">Explore More Free Developer Tools</h3>
                 <p className="text-xs text-neutral-500 mt-0.5">
-                  Speed up message transformations, Groovy scripting, and IDoc debugging.
+                  Speed up XML formatting, XSD schema generation, XPath testing, and IDoc debugging.
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <Link to="/tools/xml-formatter">
                   <Button variant="secondary" size="sm">
-                    XML Formatter &amp; Beautifier
+                    XML Formatter
+                  </Button>
+                </Link>
+                <Link to="/tools/xml-to-xsd">
+                  <Button variant="secondary" size="sm">
+                    XML to XSD
                   </Button>
                 </Link>
                 <Link to="/tools">

@@ -216,12 +216,13 @@ export function Footer() {
                 <li>
                   <Link
                     to="/tools/xml-validator"
+                    title="Free XML Validator Online"
                     className="flex items-center gap-3 text-sm text-neutral-700 hover:text-emerald-700 transition-colors group"
                   >
                     <div className="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-100/80 flex items-center justify-center text-emerald-600 shrink-0 group-hover:bg-emerald-100 transition-colors">
                       <ShieldCheck className="h-4 w-4 stroke-[2]" />
                     </div>
-                    <span>XML Validator</span>
+                    <span>Free XML Validator</span>
                   </Link>
                 </li>
                 <li>

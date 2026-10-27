@@ -36,7 +36,20 @@ export const tools: Tool[] = [
     seo: {
       title: 'Free XML Validator Online | ToolSAP',
       description: 'Validate XML syntax, find errors with line numbers, and check XML against an XSD schema using ToolSAP’s free online XML Validator.',
-      keywords: ['free xml validator online', 'xml validator', 'validate xml', 'xml syntax checker', 'sap xml validator', 'xsd validator online', 'cpi xml validator', 'toolsap'],
+      keywords: [
+        'free xml validator online',
+        'free xml validator',
+        'xml validator online',
+        'xml validator',
+        'validate xml online',
+        'xml syntax checker',
+        'check xml errors online',
+        'online xml validator',
+        'validate xml with xsd',
+        'xsd validator online',
+        'sap xml validator',
+        'toolsap',
+      ],
     },
   },
   {

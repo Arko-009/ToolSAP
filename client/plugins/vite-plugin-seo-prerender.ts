@@ -177,37 +177,44 @@ export function seoPrerenderPlugin(): Plugin {
 
       console.log(`[seo-prerender] Successfully generated static SEO pages for all ${routes.length} routes!`);
 
-      // ── Auto-update root vercel.json with explicit rewrites for prerendered pages ──
+      // ── Auto-update vercel.json (both root and client/) with explicit rewrites ──
       // Vercel's catch-all rewrite "/(.*)" → "/index.html" intercepts requests before
       // cleanUrls can resolve them to their static .html files. By adding explicit
       // rewrites for every prerendered route *before* the catch-all, Vercel will serve
       // the correct per-page HTML (with unique title, description, canonical, JSON-LD)
       // instead of the generic homepage index.html.
       const rootVercelPath = path.resolve(import.meta.dirname, '../../vercel.json');
-      if (fs.existsSync(rootVercelPath)) {
-        try {
-          const vercelConfig = JSON.parse(fs.readFileSync(rootVercelPath, 'utf-8'));
+      const clientVercelPath = path.resolve(import.meta.dirname, '../vercel.json');
+      const vercelConfigPaths = [rootVercelPath, clientVercelPath];
 
-          // Build explicit rewrites for every prerendered non-homepage route
-          const prerenderRewrites = routes
-            .filter((r) => r.path !== '/' && r.canonical !== '/')
-            .map((r) => {
-              const cleanPath = r.canonical.replace(/^\//, '');
-              return {
-                source: r.canonical,
-                destination: `/${cleanPath}.html`,
-              };
-            });
+      // Build explicit rewrites for every prerendered non-homepage route
+      const prerenderRewrites = routes
+        .filter((r) => r.path !== '/' && r.canonical !== '/')
+        .map((r) => {
+          const cleanPath = r.canonical.replace(/^\//, '');
+          return {
+            source: r.canonical,
+            destination: `/${cleanPath}.html`,
+          };
+        });
 
-          // SPA catch-all fallback (must be last)
-          const spaFallback = { source: '/(.*)', destination: '/index.html' };
+      // SPA catch-all fallback (must be last)
+      const spaFallback = { source: '/(.*)', destination: '/index.html' };
 
-          vercelConfig.rewrites = [...prerenderRewrites, spaFallback];
+      for (const vercelPath of vercelConfigPaths) {
+        if (fs.existsSync(vercelPath)) {
+          try {
+            const vercelConfig = JSON.parse(fs.readFileSync(vercelPath, 'utf-8'));
+            vercelConfig.cleanUrls = true;
+            vercelConfig.trailingSlash = false;
+            vercelConfig.rewrites = [...prerenderRewrites, spaFallback];
 
-          fs.writeFileSync(rootVercelPath, JSON.stringify(vercelConfig, null, 2) + '\n', 'utf-8');
-          console.log(`[seo-prerender] Updated root vercel.json with ${prerenderRewrites.length} explicit rewrites + SPA fallback.`);
-        } catch (err) {
-          console.warn(`[seo-prerender] Warning: Could not update root vercel.json:`, err);
+            fs.writeFileSync(vercelPath, JSON.stringify(vercelConfig, null, 2) + '\n', 'utf-8');
+            const displayPath = path.relative(path.resolve(import.meta.dirname, '../..'), vercelPath) || 'vercel.json';
+            console.log(`[seo-prerender] Updated ${displayPath} with ${prerenderRewrites.length} explicit rewrites + SPA fallback.`);
+          } catch (err) {
+            console.warn(`[seo-prerender] Warning: Could not update ${vercelPath}:`, err);
+          }
         }
       }
 

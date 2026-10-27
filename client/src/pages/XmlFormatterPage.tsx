@@ -17,11 +17,11 @@ import {
   Shield,
   Clock,
   Layers,
+  ChevronDown,
 } from 'lucide-react';
 import { SEOHead } from '@/components/common/SEOHead';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
 import { useToastContext } from '@/components/ui/Toast';
 import { ToolWorkspaceLayout } from '@/components/tools/ToolWorkspaceLayout';
 import { CodeEditor } from '@/components/tools/CodeEditor';
@@ -36,6 +36,39 @@ import { Link, useNavigate } from 'react-router-dom';
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
+export const XML_FORMATTER_FAQS = [
+  {
+    question: 'What is an XML Formatter and why should I use it?',
+    answer:
+      'An XML Formatter (or XML Beautifier / Pretty Printer) organizes raw, unformatted, or minified XML code by applying consistent indentation, line breaks, and tag alignment according to W3C specifications. It makes complex XML documents, SOAP messages, SAP IDocs, and API responses easy to read, debug, and maintain.',
+  },
+  {
+    question: 'How do I format or pretty print XML online for free?',
+    answer:
+      'Simply paste your unformatted XML into the left code editor or click "Upload File" to select an XML file from your device. Choose your preferred indentation (2 spaces or 4 spaces) and quote style, then click "Format XML". Your beautified, syntax-highlighted XML appears instantly in the right pane ready to copy or download.',
+  },
+  {
+    question: 'What is the difference between XML Formatting (Pretty Print) and Minification?',
+    answer:
+      'XML Formatting (Pretty Print) adds standardized indentation and newlines to maximize human readability for development and debugging. XML Minification removes all unnecessary whitespace, indentations, and line breaks without altering element data, significantly reducing payload file size for faster API transmission over networks.',
+  },
+  {
+    question: 'Does this formatter preserve XML CDATA blocks and special entities?',
+    answer:
+      'Yes. ToolSAP uses an advanced enhanced parser that strictly preserves CDATA sections, DOCTYPE internal DTD subsets, special character entities (&amp;, &lt;, &gt;, &quot;, &apos;), XML namespace prefixes (xmlns), and mixed-content markup without corrupting data or breaking payload integrity.',
+  },
+  {
+    question: 'Is my XML payload private and secure when formatting online?',
+    answer:
+      'Yes, 100% private. All formatting and minification execute entirely inside your web browser using client-side JavaScript. Your confidential ERP payloads, customer data, and API messages are never sent across the internet to any external server or stored anywhere.',
+  },
+  {
+    question: 'What happens if my XML contains syntax errors?',
+    answer:
+      'If invalid XML is provided, ToolSAP detects syntax errors, highlights the issue, and provides a direct 1-click button to launch our XML Validator tool with your XML preloaded for automated syntax repair.',
+  },
+];
+
 export function XmlFormatterPage() {
   const { addToast } = useToastContext();
   const navigate = useNavigate();
@@ -45,6 +78,7 @@ export function XmlFormatterPage() {
   const [outputXml, setOutputXml] = useState('');
   const [activeFileName, setActiveFileName] = useState<string | null>(null);
   const [lastMode, setLastMode] = useState<'formatted' | 'minified' | null>(null);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
   // Redirect to XML Validator tool
   const redirectToValidator = useCallback(
@@ -381,19 +415,87 @@ export function XmlFormatterPage() {
   return (
     <>
       <SEOHead
-        title="XML Formatter & Beautifier — Free Online SAP Tool | ToolSAP"
-        description="Free in-browser XML Formatter and Beautifier for SAP Cloud Integration, IDoc XML, SOAP Envelopes, XSD, and WSDL. Format, minify, and validate locally."
+        title="Free XML Formatter Online — Beautify & Pretty Print XML | ToolSAP"
+        description="Free online XML formatter and beautifier. Pretty print XML with clean indentation, minify payloads, and highlight syntax with 100% in-browser privacy."
         canonical="/tools/xml-formatter"
         keywords={[
-          'SAP XML Formatter',
-          'XML Beautifier',
-          'SAP CPI XML',
-          'SOAP XML Formatter',
-          'IDoc XML Formatter',
-          'XML Minifier',
-          'XSD Formatter',
-          'WSDL Formatter',
+          'free xml formatter online',
+          'free xml formatter',
+          'xml formatter online',
+          'xml formatter',
+          'xml beautifier online',
+          'pretty print xml online',
+          'format xml online',
+          'xml minifier online',
+          'xml pretty print',
+          'sap xml formatter',
+          'toolsap',
         ]}
+      />
+
+      {/* JSON-LD Structured Data with @graph for WebApplication, BreadcrumbList, and FAQPage */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@graph': [
+              {
+                '@type': 'WebApplication',
+                name: 'Free XML Formatter Online — Beautify & Pretty Print XML | ToolSAP',
+                url: 'https://tool-sap.vercel.app/tools/xml-formatter',
+                description:
+                  'Free online XML formatter and beautifier. Pretty print XML with clean indentation, minify payloads, and highlight syntax with 100% in-browser privacy.',
+                applicationCategory: 'DeveloperApplication',
+                operatingSystem: 'All',
+                offers: {
+                  '@type': 'Offer',
+                  price: '0',
+                  priceCurrency: 'USD',
+                },
+                creator: {
+                  '@type': 'Organization',
+                  name: 'ToolSAP',
+                  url: 'https://tool-sap.vercel.app/',
+                },
+              },
+              {
+                '@type': 'BreadcrumbList',
+                itemListElement: [
+                  {
+                    '@type': 'ListItem',
+                    position: 1,
+                    name: 'Home',
+                    item: 'https://tool-sap.vercel.app/',
+                  },
+                  {
+                    '@type': 'ListItem',
+                    position: 2,
+                    name: 'Tools',
+                    item: 'https://tool-sap.vercel.app/tools',
+                  },
+                  {
+                    '@type': 'ListItem',
+                    position: 3,
+                    name: 'Free XML Formatter Online',
+                    item: 'https://tool-sap.vercel.app/tools/xml-formatter',
+                  },
+                ],
+              },
+              {
+                '@type': 'FAQPage',
+                mainEntity: XML_FORMATTER_FAQS.map((faq) => ({
+                  '@type': 'Question',
+                  name: faq.question,
+                  acceptedAnswer: {
+                    '@type': 'Answer',
+                    text: faq.answer,
+                  },
+                })),
+              },
+            ],
+          }),
+        }}
       />
 
       {/* Hidden file input for file picker */}
@@ -789,60 +891,246 @@ export function XmlFormatterPage() {
           </div>
         }
         infoSection={
-          /* Developer Educational & Reference Section */
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card padding="md" className="border-neutral-200/90">
-              <div className="flex items-center gap-2 mb-2 text-primary-600">
-                <Shield className="h-4 w-4" />
-                <h4 className="text-sm font-bold text-neutral-900">SAP Security & Privacy</h4>
+          <div className="border-t border-neutral-200/80 pt-12 space-y-14">
+            {/* Section 1: How to Format XML Online (3 Steps) */}
+            <div>
+              <div className="max-w-3xl mb-8">
+                <Badge variant="neutral" size="sm" className="mb-2">
+                  Step-by-Step Guide
+                </Badge>
+                <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 tracking-tight">
+                  How to Format &amp; Beautify XML Online in 3 Easy Steps
+                </h2>
+                <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
+                  Transform messy, compact, or unformatted XML into clean, properly indented markup with zero setup.
+                </p>
               </div>
-              <p className="text-xs text-neutral-600 leading-relaxed">
-                Enterprise payloads, customer master data, and internal IDs are processed 100% locally in your web browser. No network payloads or third-party tracking APIs are executed.
-              </p>
-            </Card>
 
-            <Card padding="md" className="border-neutral-200/90">
-              <div className="flex items-center gap-2 mb-2 text-emerald-600">
-                <Layers className="h-4 w-4" />
-                <h4 className="text-sm font-bold text-neutral-900">Payload Integrity</h4>
-              </div>
-              <p className="text-xs text-neutral-600 leading-relaxed">
-                Preserves CDATA blocks, SOAP Header namespaces, XML declarations, and tag attribute sequences required by SAP Integration Suite and SOAP receivers.
-              </p>
-            </Card>
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs relative">
+                  <div className="w-8 h-8 rounded-lg bg-primary-50 text-primary-600 font-bold text-sm flex items-center justify-center mb-3">
+                    1
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">
+                    Paste or Upload XML
+                  </h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Paste raw XML markup into the left code editor or click <strong className="text-neutral-800">Upload File</strong> to load any <code className="text-primary-700 bg-neutral-100 px-1 py-0.5 rounded">.xml</code>, <code className="text-primary-700 bg-neutral-100 px-1 py-0.5 rounded">.xsd</code>, or <code className="text-primary-700 bg-neutral-100 px-1 py-0.5 rounded">.wsdl</code> payload up to 5 MB.
+                  </p>
+                </div>
 
-            <Card padding="md" className="border-neutral-200/90">
-              <div className="flex items-center gap-2 mb-2 text-primary-600">
-                <FileCode className="h-4 w-4" />
-                <h4 className="text-sm font-bold text-neutral-900">Related Tools</h4>
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs relative">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 font-bold text-sm flex items-center justify-center mb-3">
+                    2
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">
+                    Choose Indentation Options
+                  </h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Select your preferred tab width (2 spaces or 4 spaces) and quote style (double quotes or single quotes) using the formatting toolbar.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs relative">
+                  <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 font-bold text-sm flex items-center justify-center mb-3">
+                    3
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">
+                    Format XML or Minify
+                  </h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Click <strong className="text-neutral-800">Format XML</strong> for pretty print indentation, or click <strong className="text-neutral-800">Minify</strong> to compress. Copy or download your clean output instantly.
+                  </p>
+                </div>
               </div>
-              <p className="text-xs text-neutral-600 leading-relaxed mb-3">
-                Need schema validation or XSD creation for your message mappings?
-              </p>
-              <div className="flex flex-col gap-1.5 text-xs">
-                <Link
-                  to="/tools/xml-validator"
-                  className="text-emerald-600 hover:text-emerald-700 font-semibold inline-flex items-center gap-1"
-                >
-                  <span>XML Validator &amp; Schema Checker</span>
-                  <ArrowRight className="h-3 w-3" />
+            </div>
+
+            {/* Section 2: Key Capabilities Grid */}
+            <div>
+              <div className="max-w-3xl mb-8">
+                <Badge variant="neutral" size="sm" className="mb-2">
+                  Tool Capabilities
+                </Badge>
+                <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 tracking-tight">
+                  Free Online XML Formatter Features
+                </h2>
+                <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
+                  Built for web developers, data engineers, and SAP integration specialists who require clean, reliable, and secure XML formatting.
+                </p>
+              </div>
+
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">W3C Pretty Print Formatting</h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Standardizes nested element indentation, aligns attributes, and cleanly formats closing tags adhering to strict W3C XML rules.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
+                    <Minimize2 className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">Safe XML Minification</h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Compresses XML by stripping unnecessary whitespace and newlines while strictly preserving text content, CDATA blocks, and comments.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center mb-3">
+                    <Shield className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">100% In-Browser Privacy</h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    All formatting processes locally inside your browser via client-side JavaScript. No sensitive business data or credentials ever touch an external server.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center mb-3">
+                    <Layers className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">CDATA &amp; Entity Integrity</h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Enhanced parser guarantees strict protection for CDATA sections, DOCTYPE DTD subsets, special entity escapes (&amp;amp;, &amp;lt;), and namespace prefixes.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center mb-3">
+                    <Settings2 className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">Customizable Indentation</h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Easily toggle between 2-space and 4-space tab widths, double quotes, and single quotes to match your team&apos;s code formatting style guidelines.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center mb-3">
+                    <FileCheck className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-neutral-900 mb-1">Syntax Error Auto-Detection</h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Instant error detection with a 1-click shortcut to launch our XML Validator tool preloaded with your XML to inspect and auto-fix issues.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 3: Formatting vs Minification Comparison */}
+            <div className="p-6 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+              <div className="max-w-3xl mb-6">
+                <Badge variant="neutral" size="sm" className="mb-2">
+                  Technical Comparison
+                </Badge>
+                <h2 className="text-lg font-bold text-neutral-900">
+                  XML Pretty Print vs. XML Minification
+                </h2>
+                <p className="text-xs text-neutral-600 mt-1">
+                  Understanding when to format for human readability versus minifying for production network performance.
+                </p>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6 text-xs">
+                <div className="p-4 rounded-lg bg-neutral-50 border border-neutral-200">
+                  <h4 className="font-semibold text-neutral-900 mb-1.5 flex items-center gap-1.5 text-primary-700">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span>XML Formatting (Pretty Print)</span>
+                  </h4>
+                  <p className="text-neutral-600 leading-relaxed">
+                    Adds standardized indentation (2 or 4 spaces) and newlines between child tags. Best for code reviews, inspecting API payloads, debugging SOAP messages, and editing configuration files.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-lg bg-neutral-50 border border-neutral-200">
+                  <h4 className="font-semibold text-neutral-900 mb-1.5 flex items-center gap-1.5 text-emerald-700">
+                    <Minimize2 className="h-3.5 w-3.5" />
+                    <span>XML Minification (Compress)</span>
+                  </h4>
+                  <p className="text-neutral-600 leading-relaxed">
+                    Removes all unnecessary whitespace, indentations, and line breaks while keeping text content intact. Reduces payload size by 30% to 60% for faster HTTP transmission over networks.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 4: Frequently Asked Questions (FAQ) Accordion */}
+            <div>
+              <div className="max-w-3xl mb-8">
+                <Badge variant="neutral" size="sm" className="mb-2">
+                  Frequently Asked Questions
+                </Badge>
+                <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 tracking-tight">
+                  Free XML Formatter FAQs
+                </h2>
+                <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
+                  Answers to common questions about XML pretty printing, minification, and data security.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {XML_FORMATTER_FAQS.map((faq, idx) => {
+                  const isOpen = openFaqIndex === idx;
+                  return (
+                    <div
+                      key={idx}
+                      className="rounded-xl border border-neutral-200 bg-white shadow-2xs overflow-hidden transition-colors"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                        className="w-full py-4 px-5 text-left flex items-center justify-between gap-4 font-semibold text-sm text-neutral-900 hover:text-primary-600 transition-colors cursor-pointer"
+                        aria-expanded={isOpen}
+                      >
+                        <span>{faq.question}</span>
+                        <ChevronDown
+                          className={`h-4 w-4 shrink-0 text-neutral-400 transition-transform duration-200 ${
+                            isOpen ? 'rotate-180 text-primary-600' : ''
+                          }`}
+                        />
+                      </button>
+                      {isOpen && (
+                        <div className="px-5 pb-5 text-xs text-neutral-600 leading-relaxed border-t border-neutral-100 pt-3 animate-fade-in">
+                          {faq.answer}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Section 5: Cross-Links to Other Tools */}
+            <div className="p-6 rounded-xl bg-neutral-50 border border-neutral-200/90 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-semibold text-neutral-900">Explore More Free Developer Tools</h3>
+                <p className="text-xs text-neutral-500 mt-0.5">
+                  Speed up XML validation, schema generation, XPath testing, and payload debugging.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Link to="/tools/xml-validator">
+                  <Button variant="secondary" size="sm">
+                    XML Validator
+                  </Button>
                 </Link>
-                <Link
-                  to="/tools"
-                  className="text-primary-600 hover:text-primary-700 font-semibold inline-flex items-center gap-1"
-                >
-                  <span>Explore all Developer Tools</span>
-                  <ArrowRight className="h-3 w-3" />
+                <Link to="/tools/xml-to-xsd">
+                  <Button variant="secondary" size="sm">
+                    XML to XSD
+                  </Button>
                 </Link>
-                <Link
-                  to="/learning"
-                  className="text-neutral-600 hover:text-primary-600 inline-flex items-center gap-1"
-                >
-                  <span>Message Transformation Guide</span>
-                  <ArrowRight className="h-3 w-3" />
+                <Link to="/tools">
+                  <Button variant="primary" size="sm">
+                    All Tools
+                  </Button>
                 </Link>
               </div>
-            </Card>
+            </div>
           </div>
         }
       />

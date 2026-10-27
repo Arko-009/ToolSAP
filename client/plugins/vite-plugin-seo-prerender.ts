@@ -197,6 +197,106 @@ export function seoPrerenderPlugin(): Plugin {
                 },
               ],
             };
+          } else if (route.canonical === '/tools/xml-formatter') {
+            structuredData = {
+              '@context': 'https://schema.org',
+              '@graph': [
+                {
+                  '@type': 'WebApplication',
+                  name: route.title,
+                  url: fullCanonical,
+                  description: route.description,
+                  applicationCategory: 'DeveloperApplication',
+                  operatingSystem: 'All',
+                  offers: {
+                    '@type': 'Offer',
+                    price: '0',
+                    priceCurrency: 'USD',
+                  },
+                  creator: {
+                    '@type': 'Organization',
+                    name: 'ToolSAP',
+                    url: 'https://tool-sap.vercel.app/',
+                  },
+                },
+                {
+                  '@type': 'BreadcrumbList',
+                  itemListElement: [
+                    {
+                      '@type': 'ListItem',
+                      position: 1,
+                      name: 'Home',
+                      item: 'https://tool-sap.vercel.app/',
+                    },
+                    {
+                      '@type': 'ListItem',
+                      position: 2,
+                      name: 'Tools',
+                      item: 'https://tool-sap.vercel.app/tools',
+                    },
+                    {
+                      '@type': 'ListItem',
+                      position: 3,
+                      name: 'Free XML Formatter Online',
+                      item: 'https://tool-sap.vercel.app/tools/xml-formatter',
+                    },
+                  ],
+                },
+                {
+                  '@type': 'FAQPage',
+                  mainEntity: [
+                    {
+                      '@type': 'Question',
+                      name: 'What is an XML Formatter and why should I use it?',
+                      acceptedAnswer: {
+                        '@type': 'Answer',
+                        text: 'An XML Formatter (or XML Beautifier / Pretty Printer) organizes raw, unformatted, or minified XML code by applying consistent indentation, line breaks, and tag alignment according to W3C specifications. It makes complex XML documents, SOAP messages, SAP IDocs, and API responses easy to read, debug, and maintain.',
+                      },
+                    },
+                    {
+                      '@type': 'Question',
+                      name: 'How do I format or pretty print XML online for free?',
+                      acceptedAnswer: {
+                        '@type': 'Answer',
+                        text: 'Simply paste your unformatted XML into the left code editor or click "Upload File" to select an XML file from your device. Choose your preferred indentation (2 spaces or 4 spaces) and quote style, then click "Format XML". Your beautified, syntax-highlighted XML appears instantly in the right pane ready to copy or download.',
+                      },
+                    },
+                    {
+                      '@type': 'Question',
+                      name: 'What is the difference between XML Formatting (Pretty Print) and Minification?',
+                      acceptedAnswer: {
+                        '@type': 'Answer',
+                        text: 'XML Formatting (Pretty Print) adds standardized indentation and newlines to maximize human readability for development and debugging. XML Minification removes all unnecessary whitespace, indentations, and line breaks without altering element data, significantly reducing payload file size for faster API transmission over networks.',
+                      },
+                    },
+                    {
+                      '@type': 'Question',
+                      name: 'Does this formatter preserve XML CDATA blocks and special entities?',
+                      acceptedAnswer: {
+                        '@type': 'Answer',
+                        text: 'Yes. ToolSAP uses an advanced enhanced parser that strictly preserves CDATA sections, DOCTYPE internal DTD subsets, special character entities (&amp;, &lt;, &gt;, &quot;, &apos;), XML namespace prefixes (xmlns), and mixed-content markup without corrupting data or breaking payload integrity.',
+                      },
+                    },
+                    {
+                      '@type': 'Question',
+                      name: 'Is my XML payload private and secure when formatting online?',
+                      acceptedAnswer: {
+                        '@type': 'Answer',
+                        text: 'Yes, 100% private. All formatting and minification execute entirely inside your web browser using client-side JavaScript. Your confidential ERP payloads, customer data, and API messages are never sent across the internet to any external server or stored anywhere.',
+                      },
+                    },
+                    {
+                      '@type': 'Question',
+                      name: 'What happens if my XML contains syntax errors?',
+                      acceptedAnswer: {
+                        '@type': 'Answer',
+                        text: 'If invalid XML is provided, ToolSAP detects syntax errors, highlights the issue, and provides a direct 1-click button to launch our XML Validator tool with your XML preloaded for automated syntax repair.',
+                      },
+                    },
+                  ],
+                },
+              ],
+            };
           } else {
             structuredData = route.structuredDataType === 'WebApplication'
               ? {
@@ -296,6 +396,70 @@ export function seoPrerenderPlugin(): Plugin {
             <a href="/">ToolSAP Home</a> |
             <a href="/tools">All Tools</a> |
             <a href="/tools/xml-formatter">Free XML Formatter</a> |
+            <a href="/tools/xml-to-xsd">XML to XSD Generator</a> |
+            <a href="/tools/xpath-tester">XPath Tester</a> |
+            <a href="/learning">SAP Learning Hub</a> |
+            <a href="/about">About ToolSAP</a>
+          </nav>
+        </section>
+      </main>
+      <p>ToolSAP provides developer tools and practical learning for SAP developers. Please enable JavaScript to run this application.</p>
+    </noscript>`;
+        } else if (route.canonical === '/tools/xml-formatter') {
+          noscriptContent = `
+    <noscript>
+      <header>
+        <h1>Free XML Formatter Online — Beautify &amp; Pretty Print XML | ToolSAP</h1>
+        <p>Free online XML formatter and beautifier. Pretty print XML with clean indentation, minify payloads, and highlight syntax with 100% in-browser privacy.</p>
+      </header>
+      <main>
+        <section>
+          <h2>How to Format &amp; Beautify XML Online in 3 Easy Steps</h2>
+          <ol>
+            <li><strong>Step 1: Paste or Upload XML:</strong> Paste raw XML markup into the code editor or upload an .xml, .xsd, or .wsdl file up to 5 MB.</li>
+            <li><strong>Step 2: Choose Indentation Options:</strong> Select 2-space or 4-space tab widths and double or single quotes using the toolbar.</li>
+            <li><strong>Step 3: Format XML or Minify:</strong> Click Format XML for pretty print indentation, or click Minify to compress payload size. Copy or download output instantly.</li>
+          </ol>
+        </section>
+        <section>
+          <h2>Free Online XML Formatter Capabilities</h2>
+          <ul>
+            <li><strong>W3C Pretty Print Formatting:</strong> Clean indentation and alignment adhering to W3C specifications.</li>
+            <li><strong>Safe XML Minification:</strong> Removes whitespace and line breaks while preserving data.</li>
+            <li><strong>100% In-Browser Privacy:</strong> All processing is executed client-side without server transmission.</li>
+            <li><strong>CDATA &amp; Entity Integrity:</strong> Strict protection for CDATA sections, DTD subsets, and special entities.</li>
+            <li><strong>Customizable Indentation:</strong> Toggle between 2 spaces and 4 spaces.</li>
+            <li><strong>Syntax Error Auto-Detection:</strong> Instant error warnings with 1-click XML Validator repair.</li>
+          </ul>
+        </section>
+        <section>
+          <h2>XML Pretty Print vs. XML Minification</h2>
+          <p><strong>XML Formatting (Pretty Print):</strong> Adds standardized indentation and newlines to maximize human readability for development and debugging.</p>
+          <p><strong>XML Minification (Compress):</strong> Removes unnecessary whitespace to reduce file size by 30% to 60% for faster network transmission.</p>
+        </section>
+        <section>
+          <h2>Frequently Asked Questions (FAQ)</h2>
+          <dl>
+            <dt><strong>What is an XML Formatter and why should I use it?</strong></dt>
+            <dd>An XML Formatter organizes raw, minified, or unindented XML markup with clean indentation and line breaks, making it easy to read and debug.</dd>
+            <dt><strong>How do I format or pretty print XML online for free?</strong></dt>
+            <dd>Paste your XML code directly into ToolSAP, select 2 or 4 spaces indentation, and click Format XML.</dd>
+            <dt><strong>What is the difference between XML Formatting (Pretty Print) and Minification?</strong></dt>
+            <dd>Formatting adds indentation for human readability; minification strips whitespace for compact file size and faster transmission.</dd>
+            <dt><strong>Does this formatter preserve XML CDATA blocks and special entities?</strong></dt>
+            <dd>Yes. ToolSAP preserves CDATA sections, DTD internal subsets, and escaped entities without alteration.</dd>
+            <dt><strong>Is my XML payload private and secure when formatting online?</strong></dt>
+            <dd>Yes, 100% private. All processing runs locally in your browser with zero server uploads.</dd>
+            <dt><strong>What happens if my XML contains syntax errors?</strong></dt>
+            <dd>ToolSAP alerts you to syntax issues and provides a 1-click redirect to our XML Validator tool preloaded with your XML.</dd>
+          </dl>
+        </section>
+        <section>
+          <h2>Explore More Free Developer Tools</h2>
+          <nav>
+            <a href="/">ToolSAP Home</a> |
+            <a href="/tools">All Tools</a> |
+            <a href="/tools/xml-validator">Free XML Validator</a> |
             <a href="/tools/xml-to-xsd">XML to XSD Generator</a> |
             <a href="/tools/xpath-tester">XPath Tester</a> |
             <a href="/learning">SAP Learning Hub</a> |

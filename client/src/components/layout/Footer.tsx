@@ -205,12 +205,13 @@ export function Footer() {
                 <li>
                   <Link
                     to="/tools/xml-formatter"
+                    title="Free XML Formatter Online"
                     className="flex items-center gap-3 text-sm text-neutral-700 hover:text-primary-600 transition-colors group"
                   >
                     <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-100/80 flex items-center justify-center text-primary-600 shrink-0 group-hover:bg-blue-100 transition-colors">
                       <FileCode className="h-4 w-4 stroke-[2]" />
                     </div>
-                    <span>XML Formatter</span>
+                    <span>Free XML Formatter</span>
                   </Link>
                 </li>
                 <li>

@@ -1,4 +1,4 @@
-import { BookOpen, Layers, GitBranch, Cpu, ShieldCheck } from 'lucide-react';
+import { BookOpen, Layers, GitBranch, Cpu, Package } from 'lucide-react';
 import { Container } from '@/components/layout/Container';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
 import { CapsuleButton } from '@/components/common/CapsuleButton';
@@ -6,32 +6,32 @@ import { RippleButton } from '@/components/ui/RippleButton';
 
 const curriculumTracks = [
   {
-    step: '01',
-    title: 'Foundations & Architecture',
-    description: 'SAP BTP environment, Integration Suite architecture, tenant setup, and fundamental message semantics.',
-    icon: Layers,
-    topics: ['BTP Subaccounts & Services', 'Integration Suite Capability Setup', 'Synchronous vs Asynchronous Patterns'],
+    id: 'sap-mm',
+    title: 'SAP MM',
+    description: 'Materials Management, procurement workflows, Purchase Orders (PO), Goods Movement (MIGO), and B2B EDI integration.',
+    icon: Package,
+    topics: ['Procure-to-Pay (P2P) Workflows', 'Purchase Orders & Goods Receipt (MIGO)', 'EDI & IDoc Vendor Integration'],
   },
   {
-    step: '02',
-    title: 'Cloud Integration (CPI) Core',
-    description: 'Designing end-to-end integration flows (iFlows), routing conditions, splitters, aggregators, and timers.',
+    id: 'sap-pipo',
+    title: 'SAP PI/PO',
+    description: 'Process Integration & Orchestration, ESR, Integration Directory, dual-stack interfaces, and CPI migration strategies.',
     icon: GitBranch,
-    topics: ['iFlow Design Guidelines', 'Router, Multicast & Splitter', 'Adapter Configuration (HTTPS, SFTP, IDoc)'],
+    topics: ['Enterprise Services Repository (ESR)', 'Integration Directory & Adapters', 'PI/PO to CPI Migration Patterns'],
   },
   {
-    step: '03',
-    title: 'Transformations & Scripting',
-    description: 'Handling complex payload transformations with Apache Groovy, XSLT 2.0/3.0, and Message Mappings.',
+    id: 'sap-abap',
+    title: 'SAP ABAP',
+    description: 'Advanced Business Application Programming, RESTful Application Programming (RAP), CDS views, and IDoc processing.',
     icon: Cpu,
-    topics: ['Groovy Scripting for CPI', 'Content Modifier Deep Dive', 'XML to JSON & Schema Validation'],
+    topics: ['ABAP RESTful Programming (RAP)', 'Core Data Services (CDS Views)', 'BAPI & IDoc Integration Flows'],
   },
   {
-    step: '04',
-    title: 'Production Readiness & Security',
-    description: 'Exception subprocesses, trace logs, OAuth2 / certificate authentication, and API Management.',
-    icon: ShieldCheck,
-    topics: ['Exception Handling & Alerts', 'Keystore & Certificate Management', 'API Management & Policy Templates'],
+    id: 'sap-btp',
+    title: 'SAP BTP',
+    description: 'Business Technology Platform, Cloud Foundry runtime, Integration Suite architecture, and tenant security.',
+    icon: Layers,
+    topics: ['BTP Subaccounts & Destinations', 'Integration Suite Capability Setup', 'Cloud Connector & Event Mesh'],
   },
 ];
 
@@ -59,7 +59,7 @@ export function CurriculumSection() {
           </p>
         </div>
 
-        {/* 4 Track Cards Grid */}
+        {/* 4 Module Cards Grid */}
         <div
           ref={gridRef}
           className={`grid sm:grid-cols-2 lg:grid-cols-4 gap-6 stagger-children ${gridVisible ? 'reveal-visible' : ''}`}
@@ -68,15 +68,12 @@ export function CurriculumSection() {
             const Icon = track.icon;
             return (
               <div
-                key={track.step}
+                key={track.id}
                 className="card-premium card-glow group relative rounded-xl bg-white border border-neutral-200/90 p-5 shadow-xs hover:shadow-md hover:border-emerald-300 transition-all duration-150 flex flex-col justify-between"
               >
                 <div>
-                  {/* Step & Icon */}
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60 chip-glow">
-                      TRACK {track.step}
-                    </span>
+                  {/* Top Icon */}
+                  <div className="flex items-center justify-end mb-4">
                     <div className="icon-lift w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-600 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
                       <Icon className="h-4 w-4" />
                     </div>

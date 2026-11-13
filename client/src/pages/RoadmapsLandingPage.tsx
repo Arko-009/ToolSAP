@@ -96,12 +96,7 @@ const themeStyles: Record<
   },
 };
 
-const categoryTabs = [
-  { id: 'All', label: 'All Roadmaps', emoji: '✨' },
-  { id: 'Development', label: 'Development', emoji: '💻' },
-  { id: 'Functional', label: 'Functional', emoji: '📦' },
-  { id: 'Technical', label: 'Technical', emoji: '⚙️' },
-] as const;
+const categoryTabs = ['All', 'Development', 'Functional', 'Technical'] as const;
 
 export function RoadmapsLandingPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -197,31 +192,30 @@ export function RoadmapsLandingPage() {
 
       <Section padding="lg">
         <Container>
-          {/* Category Filter Pills */}
-          <div className="flex items-center justify-between gap-3 flex-wrap mb-8">
+          {/* Category Tabs */}
+          <div className="flex items-center justify-between gap-4 flex-wrap mb-8 border-b border-neutral-200/80 pb-4">
             <div className="flex items-center gap-2 flex-wrap">
               {categoryTabs.map((tab) => {
                 const count =
-                  tab.id === 'All'
+                  tab === 'All'
                     ? allRoadmaps.length
-                    : allRoadmaps.filter((r) => r.category.toLowerCase() === tab.id.toLowerCase()).length;
-                const isActive = selectedCategory === tab.id;
+                    : allRoadmaps.filter((r) => r.category.toLowerCase() === tab.toLowerCase()).length;
+                const isActive = selectedCategory === tab;
 
                 return (
                   <button
-                    key={tab.id}
-                    onClick={() => setSelectedCategory(tab.id)}
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ${
+                    key={tab}
+                    onClick={() => setSelectedCategory(tab)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                       isActive
-                        ? 'bg-neutral-900 text-white shadow-xs scale-102'
-                        : 'bg-white text-neutral-600 border border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50 shadow-2xs'
+                        ? 'bg-neutral-900 text-white shadow-2xs'
+                        : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200/70'
                     }`}
                   >
-                    <span>{tab.emoji}</span>
-                    <span>{tab.label}</span>
+                    <span>{tab}</span>
                     <span
-                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
-                        isActive ? 'bg-neutral-700 text-neutral-200' : 'bg-neutral-100 text-neutral-500'
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                        isActive ? 'bg-neutral-700 text-white' : 'bg-neutral-200 text-neutral-700'
                       }`}
                     >
                       {count}
@@ -231,8 +225,8 @@ export function RoadmapsLandingPage() {
               })}
             </div>
 
-            <p className="text-xs text-neutral-400 font-mono">
-              Showing {filteredRoadmaps.length} of {allRoadmaps.length}
+            <p className="text-xs text-neutral-500 font-mono">
+              Showing {filteredRoadmaps.length} of {allRoadmaps.length} roadmaps
             </p>
           </div>
 

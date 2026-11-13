@@ -22,7 +22,6 @@ import { SEOHead } from '@/components/common/SEOHead';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Container } from '@/components/layout/Container';
 import { Section } from '@/components/layout/Section';
-import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { learningDomains } from '@/data/learningDomains';
 
@@ -188,28 +187,26 @@ export function LearningHubPage() {
                   className="group flex flex-col focus:outline-none"
                   aria-label={`View ${domain.title} curriculum track`}
                 >
-                  <Card
-                    hover
-                    padding="none"
-                    className={`flex-1 flex flex-col justify-between overflow-hidden border border-neutral-200/90 transition-all duration-200 ${accent.border} hover:shadow-md animate-fade-up animate-stagger-${Math.min(index + 1, 5)}`}
+                  <div
+                    className={`flex-1 flex flex-col justify-between rounded-2xl bg-white border border-neutral-200/80 p-5 shadow-2xs hover:shadow-md transition-all duration-300 hover:-translate-y-1 ${accent.border} animate-fade-up animate-stagger-${Math.min(index + 1, 5)}`}
                   >
-                    <div className="p-5 flex-1">
+                    <div>
                       {/* Top Header of Card */}
-                      <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex items-start justify-between gap-3 mb-3.5">
                         <div
-                          className={`w-11 h-11 rounded-xl ${accent.bg} border border-neutral-200/60 flex items-center justify-center shrink-0 ${accent.glow} transition-colors group-hover:scale-105 duration-200`}
+                          className={`w-11 h-11 rounded-2xl ${accent.bg} border border-neutral-200/60 flex items-center justify-center shrink-0 ${accent.glow} shadow-2xs group-hover:scale-108 group-hover:-rotate-3 transition-transform duration-300`}
                         >
                           <IconComponent className={`h-5 w-5 ${accent.text}`} />
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge variant="coming-soon" size="sm">
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100/80 text-neutral-600 border border-neutral-200/60 shadow-2xs">
                             {domain.badge || 'Coming Soon'}
-                          </Badge>
+                          </span>
                         </div>
                       </div>
 
                       {/* Title & Subtitle */}
-                      <h3 className="text-base font-bold text-neutral-900 group-hover:text-emerald-700 transition-colors mb-1">
+                      <h3 className="text-base font-bold text-neutral-900 group-hover:text-emerald-700 transition-colors mb-1 tracking-tight">
                         {domain.title}
                       </h3>
                       {domain.subtitle && (
@@ -229,7 +226,7 @@ export function LearningHubPage() {
                           {domain.highlights.map((item) => (
                             <span
                               key={item}
-                              className="text-[11px] text-neutral-600 bg-neutral-50 px-2 py-0.5 rounded border border-neutral-200/70"
+                              className="text-[11px] text-neutral-600 bg-neutral-50 px-2.5 py-0.5 rounded-lg border border-neutral-200/70"
                             >
                               {item}
                             </span>
@@ -239,17 +236,17 @@ export function LearningHubPage() {
                     </div>
 
                     {/* Card Footer with Redirect Action */}
-                    <div className="px-5 py-3 bg-neutral-50/70 border-t border-neutral-100 flex items-center justify-between text-xs">
-                      <span className="text-neutral-500 font-mono flex items-center gap-1.5 text-[11px]">
-                        <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                    <div className="mt-4 pt-3.5 border-t border-neutral-100 flex items-center justify-between text-xs">
+                      <span className="text-neutral-500 font-medium flex items-center gap-1.5 text-[11px]">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
                         {domain.customFooterCount || `${domain.categories.length} Modules`}
                       </span>
-                      <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 group-hover:text-emerald-700 transition-colors">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-neutral-900 text-white group-hover:bg-emerald-600 transition-colors shadow-2xs group-hover:shadow-xs">
                         <span>{domain.customCta || 'Explore Track'}</span>
-                        <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
+                        <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
                       </span>
                     </div>
-                  </Card>
+                  </div>
                 </Link>
               );
             })}

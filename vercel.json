@@ -19,6 +19,10 @@
       "destination": "/learning/integration-development.html"
     },
     {
+      "source": "/learning/roadmaps",
+      "destination": "/learning/roadmaps.html"
+    },
+    {
       "source": "/about",
       "destination": "/about.html"
     },
@@ -69,6 +73,54 @@
     {
       "source": "/tools/cron-parser",
       "destination": "/tools/cron-parser.html"
+    },
+    {
+      "source": "/learning/btp-architecture",
+      "destination": "/learning/btp-architecture.html"
+    },
+    {
+      "source": "/learning/abap-development",
+      "destination": "/learning/abap-development.html"
+    },
+    {
+      "source": "/learning/fiori-ui5",
+      "destination": "/learning/fiori-ui5.html"
+    },
+    {
+      "source": "/learning/pipo-migration",
+      "destination": "/learning/pipo-migration.html"
+    },
+    {
+      "source": "/learning/sap-logistics-mm",
+      "destination": "/learning/sap-logistics-mm.html"
+    },
+    {
+      "source": "/learning/roadmaps/sap-integration-suite",
+      "destination": "/learning/roadmaps/sap-integration-suite.html"
+    },
+    {
+      "source": "/learning/roadmaps/sap-abap-developer",
+      "destination": "/learning/roadmaps/sap-abap-developer.html"
+    },
+    {
+      "source": "/learning/roadmaps/sap-btp-developer",
+      "destination": "/learning/roadmaps/sap-btp-developer.html"
+    },
+    {
+      "source": "/learning/roadmaps/sap-fiori-ui5",
+      "destination": "/learning/roadmaps/sap-fiori-ui5.html"
+    },
+    {
+      "source": "/learning/roadmaps/sap-mm-consultant",
+      "destination": "/learning/roadmaps/sap-mm-consultant.html"
+    },
+    {
+      "source": "/learning/roadmaps/sap-sd-consultant",
+      "destination": "/learning/roadmaps/sap-sd-consultant.html"
+    },
+    {
+      "source": "/learning/roadmaps/sap-fico-consultant",
+      "destination": "/learning/roadmaps/sap-fico-consultant.html"
     },
     {
       "source": "/(.*)",

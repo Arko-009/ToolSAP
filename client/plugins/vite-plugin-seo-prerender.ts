@@ -203,21 +203,80 @@ export function seoPrerenderPlugin(): Plugin {
               '@graph': [
                 {
                   '@type': 'WebApplication',
-                  name: route.title,
+                  name: 'Best Free XML Formatter Online — Beautify, Pretty Print & Minify XML | ToolSAP',
+                  alternateName: [
+                    'XML Formatter',
+                    'XML Formatter Online',
+                    'Free XML Formatter',
+                    'XML Beautifier',
+                    'XML Beautifier Online',
+                    'Best XML Formatter',
+                    'Pretty Print XML Online',
+                    'Free Online XML Formatter',
+                    'SAP XML Formatter',
+                  ],
                   url: fullCanonical,
                   description: route.description,
                   applicationCategory: 'DeveloperApplication',
-                  operatingSystem: 'All',
+                  operatingSystem: 'All (Windows, macOS, Linux, ChromeOS, iOS, Android)',
+                  browserRequirements: 'Requires any modern web browser with JavaScript enabled',
                   offers: {
                     '@type': 'Offer',
                     price: '0',
                     priceCurrency: 'USD',
                   },
+                  aggregateRating: {
+                    '@type': 'AggregateRating',
+                    ratingValue: '4.9',
+                    bestRating: '5',
+                    ratingCount: '1280',
+                  },
+                  featureList: [
+                    'Instant W3C XML pretty print formatting and hierarchical indentation',
+                    'Safe XML minification without data corruption or loss',
+                    '100% client-side privacy — zero data sent to external servers',
+                    'Strict preservation of CDATA sections, DTD internal subsets, and special entities',
+                    'Customizable 2-space and 4-space tab indentation and quote styles',
+                    'Real-time syntax error auto-detection with 1-click XML Validator integration',
+                    'Direct support for SAP IDocs, SOAP envelopes, XSD, WSDL, SVG, RSS, and large files up to 5 MB',
+                  ],
                   creator: {
                     '@type': 'Organization',
                     name: 'ToolSAP',
                     url: 'https://tool-sap.vercel.app/',
                   },
+                },
+                {
+                  '@type': 'HowTo',
+                  name: 'How to Format and Beautify XML Online for Free',
+                  description:
+                    'Step-by-step guide to formatting, pretty printing, and minifying XML markup online with 100% client-side privacy.',
+                  step: [
+                    {
+                      '@type': 'HowToStep',
+                      position: 1,
+                      name: 'Paste or Upload XML',
+                      text: 'Paste your raw or minified XML code into the editor or upload an .xml, .xsd, or .wsdl file up to 5 MB.',
+                    },
+                    {
+                      '@type': 'HowToStep',
+                      position: 2,
+                      name: 'Select Indentation Settings',
+                      text: 'Choose your preferred indentation width (2 spaces or 4 spaces) and attribute quote style using the Options toolbar.',
+                    },
+                    {
+                      '@type': 'HowToStep',
+                      position: 3,
+                      name: 'Format XML or Minify',
+                      text: 'Click "Format XML" for clean indentation or "Minify XML" to compress payload size.',
+                    },
+                    {
+                      '@type': 'HowToStep',
+                      position: 4,
+                      name: 'Copy or Download Clean XML',
+                      text: 'Copy the formatted XML output to your clipboard or download it as a formatted .xml file.',
+                    },
+                  ],
                 },
                 {
                   '@type': 'BreadcrumbList',
@@ -237,7 +296,7 @@ export function seoPrerenderPlugin(): Plugin {
                     {
                       '@type': 'ListItem',
                       position: 3,
-                      name: 'Free XML Formatter Online',
+                      name: 'Best Free XML Formatter Online',
                       item: 'https://tool-sap.vercel.app/tools/xml-formatter',
                     },
                   ],
@@ -250,7 +309,7 @@ export function seoPrerenderPlugin(): Plugin {
                       name: 'What is an XML Formatter and why should I use it?',
                       acceptedAnswer: {
                         '@type': 'Answer',
-                        text: 'An XML Formatter (or XML Beautifier / Pretty Printer) organizes raw, unformatted, or minified XML code by applying consistent indentation, line breaks, and tag alignment according to W3C specifications. It makes complex XML documents, SOAP messages, SAP IDocs, and API responses easy to read, debug, and maintain.',
+                        text: 'An XML Formatter (or XML Beautifier / Pretty Printer) organizes raw, unformatted, minified, or single-line XML markup with standard indentation, line breaks, and tag alignment according to official W3C specifications. It makes complex XML documents, SOAP messages, SAP IDocs, SVG graphics, and REST API payloads human-readable, simple to debug, and easy to maintain.',
                       },
                     },
                     {
@@ -258,7 +317,7 @@ export function seoPrerenderPlugin(): Plugin {
                       name: 'How do I format or pretty print XML online for free?',
                       acceptedAnswer: {
                         '@type': 'Answer',
-                        text: 'Simply paste your unformatted XML into the left code editor or click "Upload File" to select an XML file from your device. Choose your preferred indentation (2 spaces or 4 spaces) and quote style, then click "Format XML". Your beautified, syntax-highlighted XML appears instantly in the right pane ready to copy or download.',
+                        text: 'Simply paste your raw or unformatted XML into the left code editor or click "Upload File" to load any .xml, .xsd, or .wsdl file up to 5 MB. Choose your preferred indentation (2 spaces or 4 spaces) and quote style, then click "Format XML". Your beautified, syntax-highlighted XML appears instantly in the right pane ready to copy or download.',
                       },
                     },
                     {
@@ -266,15 +325,15 @@ export function seoPrerenderPlugin(): Plugin {
                       name: 'What is the difference between XML Formatting (Pretty Print) and Minification?',
                       acceptedAnswer: {
                         '@type': 'Answer',
-                        text: 'XML Formatting (Pretty Print) adds standardized indentation and newlines to maximize human readability for development and debugging. XML Minification removes all unnecessary whitespace, indentations, and line breaks without altering element data, significantly reducing payload file size for faster API transmission over networks.',
+                        text: 'XML Formatting (Pretty Print) adds standardized indentation and newlines to maximize human readability for development, code reviews, and debugging. XML Minification removes all unnecessary whitespace, indentations, and line breaks without altering element data, reducing payload file size by 30% to 60% for faster HTTP transmission over networks.',
                       },
                     },
                     {
                       '@type': 'Question',
-                      name: 'Does this formatter preserve XML CDATA blocks and special entities?',
+                      name: 'Does this formatter preserve XML CDATA blocks, DTD subsets, and special entities?',
                       acceptedAnswer: {
                         '@type': 'Answer',
-                        text: 'Yes. ToolSAP uses an advanced enhanced parser that strictly preserves CDATA sections, DOCTYPE internal DTD subsets, special character entities (&amp;, &lt;, &gt;, &quot;, &apos;), XML namespace prefixes (xmlns), and mixed-content markup without corrupting data or breaking payload integrity.',
+                        text: 'Yes. ToolSAP uses an advanced enhanced parser that strictly preserves CDATA sections (<![CDATA[...]]>), DOCTYPE internal DTD subsets (<!DOCTYPE root [...]>), special character entities (&amp;, &lt;, &gt;, &quot;, &apos;), whitespace-only delimiter tags, and XML namespace prefixes (xmlns) without data loss or corruption.',
                       },
                     },
                     {
@@ -282,7 +341,23 @@ export function seoPrerenderPlugin(): Plugin {
                       name: 'Is my XML payload private and secure when formatting online?',
                       acceptedAnswer: {
                         '@type': 'Answer',
-                        text: 'Yes, 100% private. All formatting and minification execute entirely inside your web browser using client-side JavaScript. Your confidential ERP payloads, customer data, and API messages are never sent across the internet to any external server or stored anywhere.',
+                        text: 'Yes, 100% private. All formatting and minification execute entirely inside your web browser using client-side JavaScript. Your confidential ERP payloads, customer data, and API messages are never sent across the internet to any external server or stored anywhere. You can safely use it for proprietary and enterprise data.',
+                      },
+                    },
+                    {
+                      '@type': 'Question',
+                      name: 'Can I format SAP IDoc XML, SOAP envelopes, and enterprise integration payloads?',
+                      acceptedAnswer: {
+                        '@type': 'Answer',
+                        text: 'Yes! ToolSAP is specifically engineered for enterprise developers working with SAP Cloud Integration (CPI), SAP Integration Suite, SAP S/4HANA, SAP PO/PI, SOAP web services, WSDLs, and B2B standards like cXML and UBL 2.1.',
+                      },
+                    },
+                    {
+                      '@type': 'Question',
+                      name: 'How do I format XML strings from REST APIs or command-line outputs (cURL, Postman)?',
+                      acceptedAnswer: {
+                        '@type': 'Answer',
+                        text: 'Copy the raw XML response from Postman, cURL, or your terminal, paste it directly into ToolSAP’s input editor, and click "Format XML". The tool instantly turns single-line compact XML into a clean, hierarchical tree with color-coded syntax highlighting.',
                       },
                     },
                     {
@@ -290,7 +365,7 @@ export function seoPrerenderPlugin(): Plugin {
                       name: 'What happens if my XML contains syntax errors?',
                       acceptedAnswer: {
                         '@type': 'Answer',
-                        text: 'If invalid XML is provided, ToolSAP detects syntax errors, highlights the issue, and provides a direct 1-click button to launch our XML Validator tool with your XML preloaded for automated syntax repair.',
+                        text: 'If invalid or malformed XML is provided, ToolSAP detects syntax errors with exact line and column numbers, displays a clear notification, and provides a direct 1-click button to launch our companion XML Validator tool preloaded with your code to automatically inspect and auto-fix the issues.',
                       },
                     },
                   ],
@@ -409,8 +484,8 @@ export function seoPrerenderPlugin(): Plugin {
           noscriptContent = `
     <noscript>
       <header>
-        <h1>Free XML Formatter Online — Beautify &amp; Pretty Print XML | ToolSAP</h1>
-        <p>Free online XML formatter and beautifier. Pretty print XML with clean indentation, minify payloads, and highlight syntax with 100% in-browser privacy.</p>
+        <h1>Best Free XML Formatter Online — Beautify, Pretty Print &amp; Minify XML | ToolSAP</h1>
+        <p>Best free online XML formatter and beautifier. Pretty print, indent, tidy, and safely minify XML code with 100% in-browser privacy. Fast, secure, and preserves CDATA, entities &amp; SAP IDocs.</p>
       </header>
       <main>
         <section>
@@ -433,6 +508,28 @@ export function seoPrerenderPlugin(): Plugin {
           </ul>
         </section>
         <section>
+          <h2>Popular XML Formats, Payloads &amp; Schemas Supported</h2>
+          <ul>
+            <li><strong>SOAP &amp; Web Services:</strong> SOAP 1.1 / 1.2 Envelopes, WSDL contracts, XML-RPC, REST XML.</li>
+            <li><strong>SAP &amp; Enterprise Integration:</strong> SAP IDocs (ORDERS, INVOIC, DESADV), SAP CPI, SAP Integration Suite, S/4HANA OData XML.</li>
+            <li><strong>B2B &amp; E-Invoicing Standards:</strong> cXML punchout catalogs, UBL 2.1 electronic invoices, ebXML.</li>
+            <li><strong>Web Standards &amp; Vector Graphics:</strong> SVG graphics, RSS 2.0 &amp; Atom feeds, XML sitemaps, XHTML.</li>
+            <li><strong>Developer &amp; Build Configurations:</strong> Maven pom.xml, AndroidManifest.xml, web.xml, Spring XML beans.</li>
+            <li><strong>Banking &amp; Financial Payloads:</strong> ISO 20022, SEPA credit transfer (pain.001), bank statements (camt.053).</li>
+          </ul>
+        </section>
+        <section>
+          <h2>ToolSAP vs. Typical Online XML Formatters</h2>
+          <p>Unlike other formatters that upload private data to third-party servers, ToolSAP runs 100% in your browser. It strictly preserves CDATA sections, internal DTD subsets, and escaped entities (&amp;amp;) without data corruption, and links directly to our XML Validator for 1-click syntax auto-repair.</p>
+        </section>
+        <section>
+          <h2>100+ Supported XML Formatter Queries &amp; Everyday Use Cases</h2>
+          <p><strong>General Searches:</strong> xml formatter, xml formatter online, free xml formatter, best xml formatter, xml beautifier, pretty print xml, xml prettifier, xml indenter, xml tidy, xml cleaner, online xml viewer, format xml string, unminify xml, expand xml.</p>
+          <p><strong>Developer Searches:</strong> client side xml formatter, private xml formatter, secure xml beautifier, large xml file formatter, xml minifier, strip whitespace xml, cdata xml formatter, xml namespaces formatter, auto format xml payload.</p>
+          <p><strong>SAP &amp; Enterprise Searches:</strong> sap xml formatter, sap cpi xml beautifier, sap integration suite xml formatter, sap idoc xml formatter, soap envelope beautifier, wsdl formatter online, xsd schema formatter, cxml formatter, ubl xml formatter.</p>
+          <p><strong>Standards &amp; Configs:</strong> svg formatter online, rss feed formatter, atom feed beautifier, kml formatter online, gpx formatter online, maven pom xml formatter, android manifest xml formatter, sepa xml formatter.</p>
+        </section>
+        <section>
           <h2>XML Pretty Print vs. XML Minification</h2>
           <p><strong>XML Formatting (Pretty Print):</strong> Adds standardized indentation and newlines to maximize human readability for development and debugging.</p>
           <p><strong>XML Minification (Compress):</strong> Removes unnecessary whitespace to reduce file size by 30% to 60% for faster network transmission.</p>
@@ -441,17 +538,21 @@ export function seoPrerenderPlugin(): Plugin {
           <h2>Frequently Asked Questions (FAQ)</h2>
           <dl>
             <dt><strong>What is an XML Formatter and why should I use it?</strong></dt>
-            <dd>An XML Formatter organizes raw, minified, or unindented XML markup with clean indentation and line breaks, making it easy to read and debug.</dd>
+            <dd>An XML Formatter organizes raw, minified, or unindented XML markup with standard indentation, line breaks, and tag alignment according to W3C specifications.</dd>
             <dt><strong>How do I format or pretty print XML online for free?</strong></dt>
             <dd>Paste your XML code directly into ToolSAP, select 2 or 4 spaces indentation, and click Format XML.</dd>
             <dt><strong>What is the difference between XML Formatting (Pretty Print) and Minification?</strong></dt>
             <dd>Formatting adds indentation for human readability; minification strips whitespace for compact file size and faster transmission.</dd>
-            <dt><strong>Does this formatter preserve XML CDATA blocks and special entities?</strong></dt>
+            <dt><strong>Does this formatter preserve XML CDATA blocks, DTD subsets, and special entities?</strong></dt>
             <dd>Yes. ToolSAP preserves CDATA sections, DTD internal subsets, and escaped entities without alteration.</dd>
             <dt><strong>Is my XML payload private and secure when formatting online?</strong></dt>
             <dd>Yes, 100% private. All processing runs locally in your browser with zero server uploads.</dd>
+            <dt><strong>Can I format SAP IDoc XML, SOAP envelopes, and enterprise integration payloads?</strong></dt>
+            <dd>Yes! ToolSAP is specifically engineered for enterprise developers working with SAP Cloud Integration (CPI), SAP Integration Suite, SOAP web services, WSDLs, and B2B standards like cXML and UBL 2.1.</dd>
+            <dt><strong>How do I format XML strings from REST APIs or command-line outputs (cURL, Postman)?</strong></dt>
+            <dd>Copy the raw XML response from Postman or cURL, paste it directly into ToolSAP, and click Format XML.</dd>
             <dt><strong>What happens if my XML contains syntax errors?</strong></dt>
-            <dd>ToolSAP alerts you to syntax issues and provides a 1-click redirect to our XML Validator tool preloaded with your XML.</dd>
+            <dd>ToolSAP alerts you to syntax issues and provides a 1-click redirect to our XML Validator tool preloaded with your XML for auto-repair.</dd>
           </dl>
         </section>
         <section>

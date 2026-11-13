@@ -8,6 +8,7 @@ const curriculumTracks = [
   {
     id: 'sap-mm',
     title: 'SAP MM',
+    href: '/learning/sap-logistics-mm',
     description: 'Materials Management, procurement workflows, Purchase Orders (PO), Goods Movement (MIGO), and B2B EDI integration.',
     icon: Package,
     topics: ['Procure-to-Pay (P2P) Workflows', 'Purchase Orders & Goods Receipt (MIGO)', 'EDI & IDoc Vendor Integration'],
@@ -15,6 +16,7 @@ const curriculumTracks = [
   {
     id: 'sap-pipo',
     title: 'SAP PI/PO',
+    href: '/learning/pipo-migration',
     description: 'Process Integration & Orchestration, ESR, Integration Directory, dual-stack interfaces, and CPI migration strategies.',
     icon: GitBranch,
     topics: ['Enterprise Services Repository (ESR)', 'Integration Directory & Adapters', 'PI/PO to CPI Migration Patterns'],
@@ -22,6 +24,7 @@ const curriculumTracks = [
   {
     id: 'sap-abap',
     title: 'SAP ABAP',
+    href: '/learning/abap-development',
     description: 'Advanced Business Application Programming, RESTful Application Programming (RAP), CDS views, and IDoc processing.',
     icon: Cpu,
     topics: ['ABAP RESTful Programming (RAP)', 'Core Data Services (CDS Views)', 'BAPI & IDoc Integration Flows'],
@@ -29,6 +32,7 @@ const curriculumTracks = [
   {
     id: 'sap-btp',
     title: 'SAP BTP',
+    href: '/learning/btp-architecture',
     description: 'Business Technology Platform, Cloud Foundry runtime, Integration Suite architecture, and tenant security.',
     icon: Layers,
     topics: ['BTP Subaccounts & Destinations', 'Integration Suite Capability Setup', 'Cloud Connector & Event Mesh'],
@@ -106,7 +110,7 @@ export function CurriculumSection() {
                     <span>3 Topics</span>
                   </div>
                   <CapsuleButton
-                    to="/learning"
+                    to={track.href || '/learning'}
                     label="View Module"
                     variant="emerald"
                   />

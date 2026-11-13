@@ -1,18 +1,22 @@
+import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import {
   BookOpen,
   Cloud,
   Workflow,
-  CloudCog,
-  GitBranch,
-  ArrowLeftRight,
+  Cpu,
+  Layout,
+  ArrowRightLeft,
+  Package,
+  ArrowRight,
+  Search,
+  Sparkles,
+  Layers,
+  GraduationCap,
+  CheckCircle2,
   Route,
-  Plug,
+  Compass,
   Map,
-  Shield,
-  Database,
-  Globe,
-  Bug,
-  MessageSquare,
 } from 'lucide-react';
 import { SEOHead } from '@/components/common/SEOHead';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -20,33 +24,94 @@ import { Container } from '@/components/layout/Container';
 import { Section } from '@/components/layout/Section';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { integrationCategories } from '@/data/learningCategories';
+import { learningDomains } from '@/data/learningDomains';
 
 const iconMap: Record<string, React.ElementType> = {
-  BookOpen,
-  Cloud,
   Workflow,
-  CloudCog,
-  GitBranch,
-  ArrowLeftRight,
+  Cloud,
+  Cpu,
+  Layout,
+  ArrowRightLeft,
+  Package,
+  BookOpen,
+  Layers,
   Route,
-  Plug,
+  Compass,
   Map,
-  Shield,
-  Database,
-  Globe,
-  Bug,
-  MessageSquare,
+};
+
+// Color theme accent styling for each track
+const accentStyles: Record<string, { bg: string; text: string; border: string; glow: string }> = {
+  emerald: {
+    bg: 'bg-emerald-50',
+    text: 'text-emerald-600',
+    border: 'group-hover:border-emerald-300',
+    glow: 'group-hover:bg-emerald-100/60',
+  },
+  sky: {
+    bg: 'bg-sky-50',
+    text: 'text-sky-600',
+    border: 'group-hover:border-sky-300',
+    glow: 'group-hover:bg-sky-100/60',
+  },
+  indigo: {
+    bg: 'bg-indigo-50',
+    text: 'text-indigo-600',
+    border: 'group-hover:border-indigo-300',
+    glow: 'group-hover:bg-indigo-100/60',
+  },
+  purple: {
+    bg: 'bg-purple-50',
+    text: 'text-purple-600',
+    border: 'group-hover:border-purple-300',
+    glow: 'group-hover:bg-purple-100/60',
+  },
+  amber: {
+    bg: 'bg-amber-50',
+    text: 'text-amber-600',
+    border: 'group-hover:border-amber-300',
+    glow: 'group-hover:bg-amber-100/60',
+  },
+  teal: {
+    bg: 'bg-teal-50',
+    text: 'text-teal-600',
+    border: 'group-hover:border-teal-300',
+    glow: 'group-hover:bg-teal-100/60',
+  },
 };
 
 export function LearningHubPage() {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter sections by title, subtitle, or highlights
+  const filteredDomains = useMemo(() => {
+    if (!searchQuery.trim()) return learningDomains;
+    const q = searchQuery.toLowerCase();
+    return learningDomains.filter(
+      (d) =>
+        d.title.toLowerCase().includes(q) ||
+        (d.subtitle && d.subtitle.toLowerCase().includes(q)) ||
+        d.description.toLowerCase().includes(q) ||
+        (d.highlights && d.highlights.some((h) => h.toLowerCase().includes(q)))
+    );
+  }, [searchQuery]);
+
   return (
     <>
       <SEOHead
-        title="Learning Hub — SAP Integration Development"
-        description="Learn SAP Integration Suite development with structured, practical lessons. From foundations to advanced integration patterns."
+        title="Learning Hub — SAP Tracks & Curriculum | ToolSAP"
+        description="Structured, practical SAP learning designed for developers who build. Explore 6 specialized tracks covering Integration Suite, BTP, ABAP, Fiori, PI/PO Migration, and Logistics."
         canonical="/learning"
-        keywords={['SAP learning', 'SAP Integration Suite', 'SAP Cloud Integration', 'SAP tutorial']}
+        keywords={[
+          'SAP learning',
+          'SAP Integration Suite',
+          'SAP Cloud Integration',
+          'SAP BTP',
+          'SAP ABAP RAP',
+          'SAP Fiori UI5',
+          'PI PO Migration',
+          'SAP tutorial',
+        ]}
       />
 
       <PageHeader
@@ -59,55 +124,174 @@ export function LearningHubPage() {
         align="center"
       />
 
+      {/* Stats & Quick Highlights Strip */}
+      <div className="bg-neutral-50/80 border-b border-neutral-200/80 py-4">
+        <Container>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-6 flex-wrap text-xs text-neutral-600">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="font-semibold text-neutral-900">
+                  {learningDomains.length} Major Learning Tracks
+                </span>
+              </div>
+              <div className="hidden sm:flex items-center gap-1.5 text-neutral-500">
+                <GraduationCap className="h-3.5 w-3.5 text-neutral-400" />
+                <span>Hands-on, Real-World SAP Scenarios</span>
+              </div>
+              <div className="hidden md:flex items-center gap-1.5 text-neutral-500">
+                <Sparkles className="h-3.5 w-3.5 text-neutral-400" />
+                <span>100% Free Developer Resources</span>
+              </div>
+            </div>
+
+            {/* Quick Filter Search */}
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
+              <input
+                type="text"
+                placeholder="Filter tracks or topics..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-neutral-200 bg-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+              />
+            </div>
+          </div>
+        </Container>
+      </div>
+
       <Section padding="lg">
         <Container>
-          {/* Integration Development Domain */}
+          {/* Section Header */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2">
-              <h2 className="text-xl font-bold text-neutral-900">Integration Development</h2>
-              <Badge variant="coming-soon" size="sm">Coming Soon</Badge>
+              <h2 className="text-xl font-bold text-neutral-900">Curriculum Tracks</h2>
+              <Badge variant="coming-soon" size="sm">
+                {learningDomains.length} Tracks Ready
+              </Badge>
             </div>
             <p className="text-neutral-600 text-sm max-w-2xl">
-              Master SAP Integration Suite — from BTP fundamentals through advanced integration patterns, adapters, and API management.
+              Choose a dedicated track below to explore its structured modules, lesson plans, and practical hands-on exercises.
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {integrationCategories.map((category, index) => {
-              const IconComponent = iconMap[category.icon] || BookOpen;
+          {/* 5-6 Major Learning Sections Grid */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredDomains.map((domain, index) => {
+              const IconComponent = iconMap[domain.icon] || BookOpen;
+              const accent = accentStyles[domain.accentColor || 'emerald'] || accentStyles.emerald;
+
               return (
-                <Card
-                  key={category.id}
-                  hover
-                  padding="md"
-                  className={`group animate-fade-up animate-stagger-${Math.min(index + 1, 5)}`}
+                <Link
+                  key={domain.id}
+                  to={`/learning/${domain.slug}`}
+                  className="group flex flex-col focus:outline-none"
+                  aria-label={`View ${domain.title} curriculum track`}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
-                      <IconComponent className="h-5 w-5 text-emerald-600" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-sm font-semibold text-neutral-900">{category.title}</h3>
+                  <Card
+                    hover
+                    padding="none"
+                    className={`flex-1 flex flex-col justify-between overflow-hidden border border-neutral-200/90 transition-all duration-200 ${accent.border} hover:shadow-md animate-fade-up animate-stagger-${Math.min(index + 1, 5)}`}
+                  >
+                    <div className="p-5 flex-1">
+                      {/* Top Header of Card */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div
+                          className={`w-11 h-11 rounded-xl ${accent.bg} border border-neutral-200/60 flex items-center justify-center shrink-0 ${accent.glow} transition-colors group-hover:scale-105 duration-200`}
+                        >
+                          <IconComponent className={`h-5 w-5 ${accent.text}`} />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="coming-soon" size="sm">
+                            {domain.badge || 'Coming Soon'}
+                          </Badge>
+                        </div>
                       </div>
-                      <p className="text-xs text-neutral-500 leading-relaxed">
-                        {category.description}
+
+                      {/* Title & Subtitle */}
+                      <h3 className="text-base font-bold text-neutral-900 group-hover:text-emerald-700 transition-colors mb-1">
+                        {domain.title}
+                      </h3>
+                      {domain.subtitle && (
+                        <p className="text-xs font-medium text-neutral-500 mb-2.5">
+                          {domain.subtitle}
+                        </p>
+                      )}
+
+                      {/* Description */}
+                      <p className="text-xs text-neutral-600 leading-relaxed mb-4 line-clamp-3">
+                        {domain.description}
                       </p>
-                      <div className="mt-3">
-                        <Badge variant="default" size="sm">Coming Soon</Badge>
-                      </div>
+
+                      {/* Highlight Chips */}
+                      {domain.highlights && domain.highlights.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {domain.highlights.map((item) => (
+                            <span
+                              key={item}
+                              className="text-[11px] text-neutral-600 bg-neutral-50 px-2 py-0.5 rounded border border-neutral-200/70"
+                            >
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </Card>
+
+                    {/* Card Footer with Redirect Action */}
+                    <div className="px-5 py-3 bg-neutral-50/70 border-t border-neutral-100 flex items-center justify-between text-xs">
+                      <span className="text-neutral-500 font-mono flex items-center gap-1.5 text-[11px]">
+                        <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                        {domain.customFooterCount || `${domain.categories.length} Modules`}
+                      </span>
+                      <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 group-hover:text-emerald-700 transition-colors">
+                        <span>{domain.customCta || 'Explore Track'}</span>
+                        <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
+                      </span>
+                    </div>
+                  </Card>
+                </Link>
               );
             })}
           </div>
 
-          {/* Future domains hint */}
-          <div className="mt-12 text-center">
-            <p className="text-sm text-neutral-400">
-              More SAP domains (ABAP, Fiori, UI5, CAP, OData) coming soon.
-            </p>
+          {/* Empty search state */}
+          {filteredDomains.length === 0 && (
+            <div className="text-center py-12 bg-neutral-50 rounded-2xl border border-neutral-200/70">
+              <Search className="h-8 w-8 text-neutral-400 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-neutral-700">No tracks found</p>
+              <p className="text-xs text-neutral-500 mt-1">
+                Try searching for keywords like "CPI", "Groovy", "BTP", "ABAP", or "Fiori".
+              </p>
+              <button
+                onClick={() => setSearchQuery('')}
+                className="mt-3 text-xs text-emerald-600 font-medium hover:underline"
+              >
+                Clear filter
+              </button>
+            </div>
+          )}
+
+          {/* Bottom Suggestion Callout */}
+          <div className="mt-14 p-6 sm:p-8 rounded-2xl bg-gradient-to-r from-emerald-50/60 via-white to-sky-50/60 border border-neutral-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Sparkles className="h-4 w-4 text-emerald-600" />
+                <h3 className="text-sm font-bold text-neutral-900">
+                  Customizing or Suggesting a Learning Track?
+                </h3>
+              </div>
+              <p className="text-xs text-neutral-600 max-w-xl leading-relaxed">
+                All tracks and sub-modules are ready for customized curriculum modules, real-world case studies, and interactive code sandboxes.
+              </p>
+            </div>
+            <Link
+              to="/tools"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-neutral-200 text-xs font-semibold text-neutral-700 hover:text-emerald-600 hover:border-emerald-300 shadow-2xs hover:shadow-xs transition-all shrink-0"
+            >
+              <span>Explore Free Developer Tools</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
         </Container>
       </Section>

@@ -8,6 +8,9 @@ import { LoadingState } from '@/components/common/LoadingState';
 // Lazy-load pages for code splitting
 const HomePage = lazy(() => import('@/pages/HomePage').then((m) => ({ default: m.HomePage })));
 const LearningHubPage = lazy(() => import('@/pages/LearningHubPage').then((m) => ({ default: m.LearningHubPage })));
+const LearningSectionPage = lazy(() => import('@/pages/LearningSectionPage').then((m) => ({ default: m.LearningSectionPage })));
+const RoadmapsLandingPage = lazy(() => import('@/pages/RoadmapsLandingPage').then((m) => ({ default: m.RoadmapsLandingPage })));
+const RoadmapDetailPage = lazy(() => import('@/pages/RoadmapDetailPage').then((m) => ({ default: m.RoadmapDetailPage })));
 const ToolsPage = lazy(() => import('@/pages/ToolsPage').then((m) => ({ default: m.ToolsPage })));
 const XmlFormatterPage = lazy(() => import('@/pages/XmlFormatterPage').then((m) => ({ default: m.XmlFormatterPage })));
 const XmlValidatorPage = lazy(() => import('@/pages/XmlValidatorPage').then((m) => ({ default: m.XmlValidatorPage })));
@@ -46,10 +49,42 @@ export function App() {
                 }
               />
               <Route
-                path="learning/integration-development"
+                path="learning/roadmaps"
                 element={
                   <Suspense fallback={<PageLoader />}>
-                    <LearningHubPage />
+                    <RoadmapsLandingPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="learning/roadmaps/:roadmapSlug"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <RoadmapDetailPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="roadmaps"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <RoadmapsLandingPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="roadmaps/:roadmapSlug"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <RoadmapDetailPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="learning/:domainSlug"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <LearningSectionPage />
                   </Suspense>
                 }
               />

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Wrench, BookOpen, ArrowRight, CornerDownLeft, Sparkles, Layers } from 'lucide-react';
+import { Wrench, BookOpen, ArrowRight, CornerDownLeft, Sparkles, Layers, Route } from 'lucide-react';
 import { AnimatedSearchBar } from './AnimatedSearchBar';
 import { tools } from '@/data/tools';
 import { integrationCategories } from '@/data/learningCategories';
+import { learningDomains } from '@/data/learningDomains';
+import { sapRoadmaps } from '@/data/roadmapsData';
 
 interface SearchResult {
   id: string;
@@ -12,7 +14,7 @@ interface SearchResult {
   type: 'tool' | 'learning' | 'nav';
   url: string;
   badge?: string;
-  icon: typeof Wrench | typeof BookOpen | typeof Layers;
+  icon: typeof Wrench | typeof BookOpen | typeof Layers | typeof Route;
 }
 
 interface SearchModalProps {
@@ -74,6 +76,19 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
       });
     });
 
+    // Major Learning Tracks
+    learningDomains.forEach((domain) => {
+      items.push({
+        id: `track-${domain.id}`,
+        title: domain.title,
+        description: domain.description,
+        type: 'learning',
+        url: `/learning/${domain.slug}`,
+        badge: 'Curriculum Track',
+        icon: Layers,
+      });
+    });
+
     // Learning Categories
     integrationCategories.forEach((cat) => {
       items.push({
@@ -81,9 +96,22 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
         title: cat.title,
         description: cat.description,
         type: 'learning',
-        url: `/learning`,
-        badge: 'Lesson',
+        url: `/learning/integration-development`,
+        badge: 'Integration Module',
         icon: BookOpen,
+      });
+    });
+
+    // SAP Career Roadmaps
+    sapRoadmaps.forEach((roadmap) => {
+      items.push({
+        id: `roadmap-${roadmap.id}`,
+        title: roadmap.title,
+        description: roadmap.description,
+        type: 'learning',
+        url: `/learning/roadmaps/${roadmap.slug}`,
+        badge: `${roadmap.category} Roadmap`,
+        icon: Route,
       });
     });
 

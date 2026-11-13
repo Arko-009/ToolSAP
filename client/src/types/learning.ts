@@ -15,9 +15,18 @@ export interface LearningDomain {
   title: string;
   slug: string;
   description: string;
+  subtitle?: string;
   icon: string;
   categories: LearningCategory[];
   status: 'available' | 'coming-soon';
+  badge?: string;
+  level?: string;
+  highlights?: string[];
+  accentColor?: string;
+  order?: number;
+  customFooterCount?: string;
+  customCta?: string;
+  href?: string;
 }
 
 export interface Lesson {

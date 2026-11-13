@@ -85,7 +85,6 @@ export function RoadmapsLandingPage() {
 
       <PageHeader
         title="Explore SAP Roadmaps"
-        description="Discover structured learning journeys for different SAP roles, modules and technologies."
         breadcrumbs={[
           { label: 'Home', href: '/' },
           { label: 'Learning Hub', href: '/learning' },
